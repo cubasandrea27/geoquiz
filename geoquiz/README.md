@@ -6,7 +6,6 @@ Sistema de preguntas interactivo basado en ubicación GPS. Los alumnos responden
 
 Plataforma web donde el **docente** crea temas, preguntas y coordenadas GPS. Los **alumnos** se autentican y reciben preguntas según la ubicación donde se encuentran físicamente.
 
-## 👥 Equipo — Grupo 7
 
 | Rol | Responsabilidad |
 |-----|----------------|
