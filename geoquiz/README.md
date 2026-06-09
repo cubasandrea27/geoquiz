@@ -1,4 +1,4 @@
-# 🎯 Juego de Preguntas GPS
+# 🎯 GeoQuiz
 
 Sistema de preguntas interactivo basado en ubicación GPS. Los alumnos responden preguntas según su posición geográfica en tiempo real.
 
@@ -6,25 +6,29 @@ Sistema de preguntas interactivo basado en ubicación GPS. Los alumnos responden
 
 Plataforma web donde el **docente** crea temas, preguntas y coordenadas GPS. Los **alumnos** se autentican y reciben preguntas según la ubicación donde se encuentran físicamente.
 
-## 👥 Equipo — Grupo 7
+## 👥 Equipo
 
-| Rol | Responsabilidad |
-|-----|----------------|
-| 👨‍💻 Backend | Base de datos, API REST, lógica de negocio |
-| 🎨 Frontend | Interfaces, reportes, integración GPS |
-| 📄 Documentación | Casos de uso, DER, diagramas, manual |
+| Integrante | Rol |
+|------------|-----|
+| Cubas Andrea | Backend |
+| Paz Isaac | Backend |
+| Aranda Ariel | Frontend |
+| Battiston Santiago | Frontend |
+| Aguilar Sofia | Documentación |
+| Martinez Alexis | Documentación |
 
 ## 🛠️ Stack tecnológico
 
-- **Backend:** Node.js / Express 
+- **Backend:** Node.js + Express
 - **Base de datos:** MySQL
+- **Frontend:** HTML, CSS y JavaScript
 - **Autenticación:** JWT
 - **GPS:** API Geolocation del navegador
 
 ## 📁 Estructura del repositorio
 
 ```
-juego-preguntas-gps/
+geoquiz/
 ├── backend/
 │   ├── src/
 │   │   ├── controllers/
@@ -33,15 +37,16 @@ juego-preguntas-gps/
 │   │   ├── middlewares/
 │   │   └── utils/
 │   ├── database/
-│   │   └── juego_preguntas_bd.sql
+│   │   └── geoquiz.sql
 │   ├── .env.example
 │   └── package.json
 ├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   └── assets/
-│   └── package.json
+│   ├── pages/
+│   ├── components/
+│   └── assets/
+│       ├── css/
+│       ├── js/
+│       └── img/
 ├── docs/
 │   ├── casos_de_uso/
 │   ├── diagramas/
@@ -57,21 +62,21 @@ juego-preguntas-gps/
 ### Requisitos previos
 
 - Node.js >= 18
-- MySQL >= 8.0
+- MySQL (XAMPP recomendado)
 
 ### Pasos
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/[usuario]/juego-preguntas-gps.git
-cd juego-preguntas-gps
+git clone https://github.com/cubasandrea27/geoquiz.git
+cd geoquiz
 
 # 2. Configurar variables de entorno
 cp backend/.env.example backend/.env
 # Editar backend/.env con tus credenciales
 
-# 3. Crear la base de datos
-mysql -u root -p < backend/database/juego_preguntas_bd.sql
+# 3. Importar la base de datos
+# Abrir phpMyAdmin y importar backend/database/geoquiz.sql
 
 # 4. Instalar dependencias del backend
 cd backend && npm install
@@ -85,12 +90,13 @@ npm run dev
 ```env
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=juego_preguntas
+DB_NAME=geoquiz
 DB_USER=root
-DB_PASSWORD=tu_password
+DB_PASSWORD=
 
-JWT_SECRET=tu_secret_muy_seguro
 PORT=3000
+JWT_SECRET=geoquiz2026
+JWT_EXPIRES_IN=8h
 ```
 
 ## 📊 Entidades principales
@@ -120,12 +126,11 @@ Alumno se autentica (DNI) → detecta ubicación GPS → ve pregunta del área
 ## 📌 Convenciones de branches
 
 ```
-main          → producción estable
-develop       → integración
-feature/xxx   → nuevas funcionalidades
-fix/xxx       → correcciones
+main                → producción estable
+develop/backend     → equipo backend
+develop/frontend    → equipo frontend
 ```
 
-## 📝 Licencia
+## 📝 Proyecto académico
 
-Proyecto académico — Uso educativo.
+Prácticas Profesionalizantes
