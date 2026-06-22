@@ -1,6 +1,8 @@
-const express = require('express');
-const router  = express.Router();
+const express  = require('express');
+const router   = express.Router();
+const { register, login } = require('../controllers/docentes.controller');
 
-// TODO: implementar rutas de docentes
+router.post('/register', register);
+router.post('/login',    login);
 
 module.exports = router;
