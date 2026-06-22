@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proyecto</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="contenedor">
+
+    <div class="titulo">
+      <h1>GeoQuiz</h1>
+    </div>
+
+    <div class="caja">
+
+      <div class="roles">
+        <button class="rol activo" onclick="cambiarRol(this, 'alumno')">Alumno</button>
+        <button class="rol" onclick="cambiarRol(this, 'docente')">Docente</button>
+      </div>
+
+      <div class="campo" id="campo-nombre" style="display: none;">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" placeholder="Ingresá tu nombre">
+      </div>
+
+      <div class="campo">
+        <label for="dni">DNI</label>
+        <input type="text" id="dni" placeholder="Ingresá tu DNI">
+      </div>
+
+      <button class="ingresar">Ingresar</button>
+
+      <hr>
+
+      <div class="links">
+        <a href="#">¿Olvidaste tu contraseña?</a>
+        <a href="#">¿No tenés cuenta? Registrate</a>
+      </div>
+
+    </div>
+
+    <p class="pie">Proyecto</p>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
