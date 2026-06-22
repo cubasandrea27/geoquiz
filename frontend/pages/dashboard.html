@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuiz</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<body>
+
+  <h1>GeoQuiz</h1>
+
+  <div id="panel-docente" style="display:none;">
+    <h2>Panel Docente</h2>
+
+    <button>Gestionar Temas</button>
+    <button>Gestionar Preguntas</button>
+    <button>Gestionar Ubicaciones</button>
+    <button>Ver Respuestas</button>
+  </div>
+
+  <div id="panel-alumno" style="display:none;">
+    <h2>Panel Alumno</h2>
+
+    <button>Ver Preguntas Cercanas</button>
+    <button>Mis Respuestas</button>
+    <button>Mis Temas</button>
+  </div>
+
+  <script>
+    const rol = localStorage.getItem("rol");
+
+    if (rol === "docente") {
+      document.getElementById("panel-docente").style.display = "block";
+    } else {
+      document.getElementById("panel-alumno").style.display = "block";
+    }
+  </script>
+
+</body>
