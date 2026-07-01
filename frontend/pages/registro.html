@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro - GeoQuiz</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="contenedor">
+    <div class="titulo">
+      <h1>Registro</h1>
+    </div>
+
+    <div class="caja">
+      <div class="roles">
+        <button class="rol activo" type="button" onclick="cambiarRolRegistro(this, 'alumno')">Alumno</button>
+        <button class="rol" type="button" onclick="cambiarRolRegistro(this, 'docente')">Docente</button>
+      </div>
+
+      <div class="campo">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" placeholder="Ingresá tu nombre">
+      </div>
+
+      <div class="campo">
+        <label for="apellido">Apellido</label>
+        <input type="text" id="apellido" placeholder="Ingresá tu apellido">
+      </div>
+
+      <div class="campo" id="campo-dni">
+        <label for="dni">DNI</label>
+        <input type="text" id="dni" placeholder="Ingresá tu DNI" inputmode="numeric" pattern="[0-9]*" maxlength="8">
+      </div>
+
+      <div class="campo" id="campo-email" style="display:none;">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Ingresá tu email">
+      </div>
+
+      <div class="campo">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" placeholder="Ingresá una contraseña">
+      </div>
+
+      <button class="ingresar" id="btnRegistrar" type="button">Registrarme</button>
+
+      <hr>
+
+      <div class="links">
+        <a href="index.html">Ya tengo cuenta. Iniciar sesión</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/registro.js"></script>
+</body>
+</html>

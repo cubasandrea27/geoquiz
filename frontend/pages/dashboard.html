@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuiz</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <h1>GeoQuiz</h1>
+    <p class="dashboard-welcome">Panel principal</p>
+
+    <div id="panel-docente" style="display:none;">
+      <h2>Panel Docente</h2>
+
+      <div class="dashboard-card">
+        <h3>Agregar tema</h3>
+        <div class="campo">
+          <label for="temaNombre">Nombre del tema</label>
+          <input type="text" id="temaNombre" placeholder="Ej: Hardware, Programación">
+        </div>
+        <div class="campo">
+          <label for="temaDescripcion">Descripción</label>
+          <input type="text" id="temaDescripcion" placeholder="Ej: Preguntas sobre componentes de PC">
+        </div>
+        <button class="ingresar" id="btnAgregarTema">Agregar tema</button>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Agregar pregunta</h3>
+        <div class="campo">
+          <label for="preguntaTema">Tema</label>
+          <input type="text" id="preguntaTema" placeholder="Ej: Programación">
+        </div>
+        <div class="campo">
+          <label for="preguntaTexto">Pregunta</label>
+          <input type="text" id="preguntaTexto" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
+        </div>
+        <div class="campo">
+          <label for="preguntaRespuesta">Respuesta correcta</label>
+          <input type="text" id="preguntaRespuesta" placeholder="Ej: HTML">
+        </div>
+        <button class="ingresar" id="btnAgregarPregunta">Agregar pregunta</button>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Acciones rápidas</h3>
+        <button class="ingresar">Gestionar Temas</button>
+        <button class="ingresar">Gestionar Preguntas</button>
+        <button class="ingresar">Gestionar Ubicaciones</button>
+        <button class="ingresar">Ver Respuestas</button>
+      </div>
+    </div>
+
+    <div id="panel-alumno" style="display:none;">
+      <h2>Panel Alumno</h2>
+      <div class="dashboard-card">
+        <button class="ingresar">Ver Preguntas Cercanas</button>
+        <button class="ingresar">Mis Respuestas</button>
+        <button class="ingresar">Mis Temas</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const rol = localStorage.getItem('rol');
+    const docenteId = localStorage.getItem('docenteId') || '1';
+
+    if (rol === 'docente') {
+      document.getElementById('panel-docente').style.display = 'block';
+    } else {
+      document.getElementById('panel-alumno').style.display = 'block';
+    }
+
+    document.getElementById('btnAgregarTema')?.addEventListener('click', async () => {
+      const nombre = document.getElementById('temaNombre').value.trim();
+      const descripcion = document.getElementById('temaDescripcion').value.trim();
+      if (!nombre) {
+        alert('Ingresá el nombre del tema');
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/temas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, descripcion, docenteId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo crear el tema');
+          return;
+        }
+
+        alert(`Tema agregado: ${nombre}`);
+        document.getElementById('temaNombre').value = '';
+        document.getElementById('temaDescripcion').value = '';
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
+      }
+    });
+
+    document.getElementById('btnAgregarPregunta')?.addEventListener('click', async () => {
+      const tema = document.getElementById('preguntaTema').value.trim();
+      const texto = document.getElementById('preguntaTexto').value.trim();
+      const respuesta = document.getElementById('preguntaRespuesta').value.trim();
+      if (!tema || !texto || !respuesta) {
+        alert('Completá tema, pregunta y respuesta correcta');
+        return;
+      }
+
+      try {
+        const temasRes = await fetch(`http://localhost:3000/api/temas?docenteId=${docenteId}`);
+        const temas = await temasRes.json();
+        const temaEncontrado = temas.find(t => t.nombre.toLowerCase() === tema.toLowerCase());
+
+        if (!temaEncontrado) {
+          alert('Primero creá el tema en la base de datos');
+          return;
+        }
+
+        const res = await fetch('http://localhost:3000/api/preguntas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ temaId: temaEncontrado.id, enunciado: texto, respuesta })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo crear la pregunta');
+          return;
+        }
+
+        alert(`Pregunta agregada al tema: ${tema}`);
+        document.getElementById('preguntaTema').value = '';
+        document.getElementById('preguntaTexto').value = '';
+        document.getElementById('preguntaRespuesta').value = '';
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
+      }
+    });
+  </script>
+</body>
