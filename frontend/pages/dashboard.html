@@ -65,7 +65,14 @@
 
   <script>
     const rol = localStorage.getItem('rol');
+    const nombre = localStorage.getItem('nombre') || 'Usuario';
     const docenteId = localStorage.getItem('docenteId') || '1';
+
+    if (!rol) {
+      window.location.href = 'index.html';
+    }
+
+    document.querySelector('.dashboard-welcome').textContent = `Bienvenido, ${nombre}`;
 
     if (rol === 'docente') {
       document.getElementById('panel-docente').style.display = 'block';

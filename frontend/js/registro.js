@@ -79,9 +79,36 @@ async function registrarUsuario() {
     password
   };
 
-  saveUserLocally(userToSave);
-  alert('Registro guardado correctamente. Ahora podés iniciar sesión.');
-  window.location.href = 'index.html';
+  try {
+    const url = rolSeleccionado === 'alumno'
+      ? 'http://localhost:3000/api/alumnos/register'
+      : 'http://localhost:3000/api/docentes/register';
+
+    const body = rolSeleccionado === 'alumno'
+      ? { nombre, apellido, dni, password }
+      : { nombre, apellido, email, password };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'No se pudo guardar el usuario.');
+      return;
+    }
+
+    saveUserLocally(userToSave);
+    alert('Registro guardado correctamente. Ahora podés iniciar sesión.');
+    window.location.href = 'index.html';
+  } catch (error) {
+    saveUserLocally(userToSave);
+    alert('No se pudo conectar con el servidor, pero se guardó localmente.');
+    window.location.href = 'index.html';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -48,6 +48,33 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    alert('No se encontró un usuario con esos datos.');
+    const url = rolSeleccionado === 'alumno'
+      ? 'http://localhost:3000/api/alumnos/login'
+      : 'http://localhost:3000/api/docentes/login';
+
+    const body = rolSeleccionado === 'alumno'
+      ? { dni: credencial, password }
+      : { email: credencial, password };
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo iniciar sesión.');
+          return;
+        }
+
+        localStorage.setItem('rol', data.rol);
+        localStorage.setItem('nombre', data.nombre || '');
+        localStorage.setItem('isLoggedIn', 'true');
+        window.location.href = 'dashboard.html';
+      })
+      .catch(() => {
+        alert('No se pudo conectar con el servidor.');
+      });
   });
 });
