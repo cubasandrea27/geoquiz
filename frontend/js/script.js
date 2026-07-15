@@ -1,6 +1,12 @@
 let rolSeleccionado = 'alumno';
 const STORAGE_KEY = 'geoquizUsers';
 
+function redirectIfLoggedIn() {
+  if (localStorage.getItem('isLoggedIn') === 'true') {
+    window.location.href = 'dashboard.html';
+  }
+}
+
 function getStoredUsers() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -24,6 +30,8 @@ function cambiarRol(btn, rol) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  redirectIfLoggedIn();
+
   const btnIngresar = document.getElementById('btnIngresar');
 
   if (!btnIngresar) return;
@@ -44,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (user && user.password === password) {
       localStorage.setItem('rol', user.rol);
       localStorage.setItem('nombre', `${user.nombre} ${user.apellido}`.trim());
+      localStorage.setItem('userId', user.identifier || '');
+      localStorage.setItem('docenteId', user.identifier || '');
+      localStorage.setItem('isLoggedIn', 'true');
       window.location.href = 'dashboard.html';
       return;
     }
@@ -70,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         localStorage.setItem('rol', data.rol);
         localStorage.setItem('nombre', data.nombre || '');
+        localStorage.setItem('userId', data.id || '');
+        localStorage.setItem('docenteId', data.id || '');
         localStorage.setItem('isLoggedIn', 'true');
         window.location.href = 'dashboard.html';
       })
