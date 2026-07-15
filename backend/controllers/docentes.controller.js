@@ -2,6 +2,10 @@ const pool    = require('../utils/db');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 
+function getJwtSecret() {
+  return process.env.JWT_SECRET || 'geoquiz-secret-local';
+}
+
 async function register(req, res) {
   const { nombre, apellido, email, password } = req.body;
   if (!nombre || !apellido || !email || !password) {
@@ -16,7 +20,7 @@ async function register(req, res) {
     res.status(201).json({ message: 'Docente registrado', id: result.insertId });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'El email ya está registrado' });
+      return res.status(409).json({ error: 'El email ya estï¿½ registrado' });
     }
     res.status(500).json({ error: 'Error interno' });
   }
@@ -24,21 +28,22 @@ async function register(req, res) {
 
 async function login(req, res) {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email y contraseña obligatorios' });
+  if (!email || !password) return res.status(400).json({ error: 'Email y contraseï¿½a obligatorios' });
   try {
     const [rows] = await pool.query('SELECT * FROM docentes WHERE email = ? AND activo = 1', [email]);
     if (rows.length === 0) return res.status(401).json({ error: 'Email no encontrado' });
     const docente = rows[0];
     const match = await bcrypt.compare(password, docente.password);
-    if (!match) return res.status(401).json({ error: 'Contraseña incorrecta' });
+    if (!match) return res.status(401).json({ error: 'ContraseÃ±a incorrecta' });
     const token = jwt.sign(
       { id: docente.id, rol: 'docente' },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      getJwtSecret(),
+      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
-    res.json({ token, nombre: docente.nombre, rol: 'docente' });
+    res.json({ token, nombre: docente.nombre, rol: 'docente', id: docente.id });
   } catch (err) {
-    res.status(500).json({ error: 'Error interno' });
+    console.error('Login docente error:', err);
+    res.status(500).json({ error: 'No se pudo iniciar sesiÃ³n. RevisÃ¡ la conexiÃ³n con la base de datos.' });
   }
 }
 

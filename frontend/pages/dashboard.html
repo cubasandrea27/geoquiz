@@ -82,6 +82,12 @@
 
   <script>
     const rol = localStorage.getItem('rol');
+
+    if (!rol || localStorage.getItem('isLoggedIn') !== 'true') {
+      window.location.href = 'index.html';
+      throw new Error('No autenticado');
+    }
+
     const ocultarKey = 'geoquiz_preguntas_ocultas_hasta';
     let preguntasActuales = [];
     let indiceActual = 0;

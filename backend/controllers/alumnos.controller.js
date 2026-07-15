@@ -2,6 +2,10 @@ const pool    = require('../utils/db');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 
+function getJwtSecret() {
+  return process.env.JWT_SECRET || 'geoquiz-secret-local';
+}
+
 async function register(req, res) {
   const { nombre, apellido, dni, password } = req.body;
   if (!nombre || !apellido || !dni) {
@@ -16,7 +20,7 @@ async function register(req, res) {
     res.status(201).json({ message: 'Alumno registrado', id: result.insertId });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'El DNI ya est� registrado' });
+      return res.status(409).json({ error: 'El DNI ya est� registrado' });
     }
     res.status(500).json({ error: 'Error interno' });
   }
@@ -30,15 +34,16 @@ async function login(req, res) {
     if (rows.length === 0) return res.status(401).json({ error: 'DNI no encontrado' });
     const alumno = rows[0];
     const match = await bcrypt.compare(password || dni, alumno.password);
-    if (!match) return res.status(401).json({ error: 'Contrase�a incorrecta' });
+    if (!match) return res.status(401).json({ error: 'Contraseña incorrecta' });
     const token = jwt.sign(
       { id: alumno.id, rol: 'alumno' },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      getJwtSecret(),
+      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
-    res.json({ token, nombre: alumno.nombre, rol: 'alumno' });
+    res.json({ token, nombre: alumno.nombre, rol: 'alumno', id: alumno.id });
   } catch (err) {
-    res.status(500).json({ error: 'Error interno' });
+    console.error('Login alumno error:', err);
+    res.status(500).json({ error: 'No se pudo iniciar sesión. Revisá la conexión con la base de datos.' });
   }
 }
 

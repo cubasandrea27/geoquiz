@@ -1,14 +1,30 @@
 
 let rolSeleccionado = 'alumno';
 
+function getBasePath() {
+  return window.location.pathname.includes('/frontend/pages/') ? '' : 'frontend/pages/';
+}
+
+function redirectIfLoggedIn() {
+  if (localStorage.getItem('isLoggedIn') === 'true') {
+    window.location.href = `${getBasePath()}dashboard.html`;
+  }
+}
+
+function getCredentialInput() {
+  return document.getElementById('credencial') || document.getElementById('dni');
+}
+
 function cambiarRol(btn, rol) {
   document.querySelectorAll('.rol').forEach(b => b.classList.remove('activo'));
   btn.classList.add('activo');
 
   rolSeleccionado = rol;
 
-  const labelCredencial = document.querySelector('label[for="dni"]');
-  const inputCredencial = document.getElementById('dni');
+  const labelCredencial = document.querySelector('label[for="credencial"], label[for="dni"]');
+  const inputCredencial = getCredentialInput();
+
+  if (!labelCredencial || !inputCredencial) return;
 
   if (rol === 'docente') {
     labelCredencial.textContent = 'Email';
@@ -29,16 +45,22 @@ function cambiarRol(btn, rol) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const btnIngresar = document.getElementById("btnIngresar");
+document.addEventListener('DOMContentLoaded', () => {
+  redirectIfLoggedIn();
+
+  const btnIngresar = document.getElementById('btnIngresar');
 
   if (!btnIngresar) return;
 
-  cambiarRol(document.querySelector('.rol.activo'), 'alumno');
+  const activeRol = document.querySelector('.rol.activo');
+  if (activeRol) {
+    cambiarRol(activeRol, rolSeleccionado);
+  }
 
-  btnIngresar.addEventListener("click", async () => {
-    const credencial = document.getElementById("dni").value.trim();
-    const password = document.getElementById("password").value.trim();
+  btnIngresar.addEventListener('click', async () => {
+    const inputCredencial = getCredentialInput();
+    const credencial = inputCredencial ? inputCredencial.value.trim() : '';
+    const password = document.getElementById('password').value.trim();
 
     if (!credencial) {
       alert(rolSeleccionado === 'docente' ? 'Ingresá tu email' : 'Ingresá tu DNI');
@@ -76,11 +98,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      localStorage.setItem("rol", data.rol);
-      localStorage.setItem("dni", rolSeleccionado === 'alumno' ? credencial : '');
-      localStorage.setItem("email", rolSeleccionado === 'docente' ? credencial : '');
-      localStorage.setItem("nombre", data.nombre || '');
-      window.location.href = "dashboard.html";
+      localStorage.setItem('rol', data.rol);
+      localStorage.setItem('dni', rolSeleccionado === 'alumno' ? credencial : '');
+      localStorage.setItem('email', rolSeleccionado === 'docente' ? credencial : '');
+      localStorage.setItem('nombre', data.nombre || '');
+      localStorage.setItem('userId', data.id || '');
+      localStorage.setItem('docenteId', data.id || '');
+      localStorage.setItem('isLoggedIn', 'true');
+      window.location.href = `${getBasePath()}dashboard.html`;
     } catch (error) {
       alert('No se pudo conectar con el servidor.');
     }
