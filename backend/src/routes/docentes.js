@@ -44,7 +44,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
 
-    res.json({ rol: 'docente', nombre: rows[0].nombre });
+    res.json({ rol: 'docente', nombre: rows[0].nombre, id: rows[0].id });
   } catch (error) {
     res.status(500).json({ error: 'No se pudo iniciar sesión' });
   }
