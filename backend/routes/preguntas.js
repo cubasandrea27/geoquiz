@@ -1,9 +1,9 @@
 const express = require('express');
 const router  = express.Router();
-const pool    = require('../utils/db');
+const pool = require('../utils/db');
 
 router.get('/', async (req, res) => {
-  const temaId = Number(req.query.temaId || req.body.temaId);
+  const temaId = req.query.temaId;
 
   if (!temaId) {
     return res.status(400).json({ error: 'Falta el temaId' });
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 
     for (const pregunta of preguntas) {
       const [opciones] = await pool.query(
-        'SELECT id, texto, es_correcta FROM opciones WHERE pregunta_id = ? ORDER BY id ASC',
+        'SELECT texto, es_correcta FROM opciones WHERE pregunta_id = ? ORDER BY id ASC',
         [pregunta.id]
       );
 
@@ -57,11 +57,13 @@ router.post('/', async (req, res) => {
     const preguntaId = result.insertId;
     const values = opciones.map((texto, index) => [preguntaId, texto, index + 1 === Number(respuestaCorrecta) ? 1 : 0]);
 
-    await pool.query('INSERT INTO opciones (pregunta_id, texto, es_correcta) VALUES ?', [values]);
+    await pool.query(
+      'INSERT INTO opciones (pregunta_id, texto, es_correcta) VALUES ?', [values]
+    );
 
-    res.status(201).json({ message: 'Pregunta creada', id: preguntaId });
+    res.status(201).json({ message: 'Pregunta guardada', id: preguntaId });
   } catch (error) {
-    res.status(500).json({ error: 'No se pudo crear la pregunta' });
+    res.status(500).json({ error: 'No se pudo guardar la pregunta' });
   }
 });
 

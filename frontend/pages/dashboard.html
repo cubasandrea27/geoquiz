@@ -7,146 +7,467 @@
   <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
-  <div class="dashboard-container">
-    <h1>GeoQuiz</h1>
-    <p class="dashboard-welcome">Panel principal</p>
+  <h1>GeoQuiz</h1>
 
-    <div id="panel-docente" style="display:none;">
-      <h2>Panel Docente</h2>
+  <div id="panel-docente" style="display:none;">
+    <h2>Panel Docente</h2>
 
-      <div class="dashboard-card">
-        <h3>Agregar tema</h3>
-        <div class="campo">
-          <label for="temaNombre">Nombre del tema</label>
-          <input type="text" id="temaNombre" placeholder="Ej: Hardware, Programación">
-        </div>
-        <div class="campo">
-          <label for="temaDescripcion">Descripción</label>
-          <input type="text" id="temaDescripcion" placeholder="Ej: Preguntas sobre componentes de PC">
-        </div>
-        <button class="ingresar" id="btnAgregarTema">Agregar tema</button>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Agregar pregunta</h3>
-        <div class="campo">
-          <label for="preguntaTema">Tema</label>
-          <input type="text" id="preguntaTema" placeholder="Ej: Programación">
-        </div>
-        <div class="campo">
-          <label for="preguntaTexto">Pregunta</label>
-          <input type="text" id="preguntaTexto" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
-        </div>
-        <div class="campo">
-          <label for="preguntaRespuesta">Respuesta correcta</label>
-          <input type="text" id="preguntaRespuesta" placeholder="Ej: HTML">
-        </div>
-        <button class="ingresar" id="btnAgregarPregunta">Agregar pregunta</button>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Acciones rápidas</h3>
-        <button class="ingresar">Gestionar Temas</button>
-        <button class="ingresar">Gestionar Preguntas</button>
-        <button class="ingresar">Gestionar Ubicaciones</button>
-        <button class="ingresar">Ver Respuestas</button>
-      </div>
+    <div class="campo">
+      <label for="temaDocente">Tema / materia</label>
+      <input type="text" id="temaDocente" placeholder="Ej: Programación, Hardware, Biología">
     </div>
 
-    <div id="panel-alumno" style="display:none;">
-      <h2>Panel Alumno</h2>
-      <div class="dashboard-card">
-        <button class="ingresar">Ver Preguntas Cercanas</button>
-        <button class="ingresar">Mis Respuestas</button>
-        <button class="ingresar">Mis Temas</button>
-      </div>
+    <div class="campo">
+      <label for="preguntaDocente">Pregunta</label>
+      <input type="text" id="preguntaDocente" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
     </div>
+
+    <div class="campo">
+      <label for="opcion1">Opción 1</label>
+      <input type="text" id="opcion1" placeholder="Respuesta 1">
+    </div>
+
+    <div class="campo">
+      <label for="opcion2">Opción 2</label>
+      <input type="text" id="opcion2" placeholder="Respuesta 2">
+    </div>
+
+    <div class="campo">
+      <label for="opcion3">Opción 3</label>
+      <input type="text" id="opcion3" placeholder="Respuesta 3">
+    </div>
+
+    <div class="campo">
+      <label for="respuestaCorrecta">Respuesta correcta</label>
+      <select id="respuestaCorrecta">
+        <option value="1">Opción 1</option>
+        <option value="2">Opción 2</option>
+        <option value="3">Opción 3</option>
+      </select>
+    </div>
+
+    <div class="campo">
+      <label for="temaEliminar">Eliminar tema</label>
+      <select id="temaEliminar">
+        <option value="">Cargando temas...</option>
+      </select>
+    </div>
+
+    <div class="campo">
+      <label for="temaResultados">Ver resultados de alumnos</label>
+      <select id="temaResultados">
+        <option value="">Cargando temas...</option>
+      </select>
+    </div>
+
+    <button class="ingresar" id="btnGuardarPregunta">Guardar pregunta</button>
+    <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
+    <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
+
+    <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
+  </div>
+
+  <div id="panel-alumno" style="display:none;">
+    <h2>Panel Alumno</h2>
+
+    <div class="campo">
+      <label for="temaSeleccionado">Elegí una materia</label>
+      <select id="temaSeleccionado">
+        <option value="">Cargando materias...</option>
+      </select>
+    </div>
+
+    <div id="preguntasAlumno"></div>
   </div>
 
   <script>
     const rol = localStorage.getItem('rol');
-    const nombre = localStorage.getItem('nombre') || 'Usuario';
-    const docenteId = localStorage.getItem('userId') || localStorage.getItem('docenteId') || '1';
-
-    if (!rol || localStorage.getItem('isLoggedIn') !== 'true') {
-      window.location.href = 'index.html';
-    }
-
-    document.querySelector('.dashboard-welcome').textContent = `Bienvenido, ${nombre}`;
+    const ocultarKey = 'geoquiz_preguntas_ocultas_hasta';
+    let preguntasActuales = [];
+    let indiceActual = 0;
+    let puntaje = 0;
+    let respuestas = [];
 
     if (rol === 'docente') {
       document.getElementById('panel-docente').style.display = 'block';
+      document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
+      document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
+      document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
+      cargarTemasDocente();
+      cargarTemasDocenteResultados();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
+      cargarMateriasAlumno();
+      verificarOcultamiento();
     }
 
-    document.getElementById('btnAgregarTema')?.addEventListener('click', async () => {
-      const nombre = document.getElementById('temaNombre').value.trim();
-      const descripcion = document.getElementById('temaDescripcion').value.trim();
-      if (!nombre) {
-        alert('Ingresá el nombre del tema');
+    async function guardarPreguntaDocente() {
+      const temaNombre = document.getElementById('temaDocente').value.trim();
+      const pregunta = document.getElementById('preguntaDocente').value.trim();
+      const opciones = [
+        document.getElementById('opcion1').value.trim(),
+        document.getElementById('opcion2').value.trim(),
+        document.getElementById('opcion3').value.trim()
+      ];
+      const correcta = document.getElementById('respuestaCorrecta').value;
+
+      if (!temaNombre || !pregunta || opciones.some(op => !op)) {
+        alert('Completá tema, pregunta y las 3 opciones.');
         return;
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/temas', {
+        const temaRes = await fetch('http://localhost:3000/api/temas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, descripcion, docenteId })
+          body: JSON.stringify({ nombre: temaNombre, descripcion: 'Materia creada desde el panel docente' })
         });
 
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || 'No se pudo crear el tema');
+        const temaData = await temaRes.json();
+        if (!temaRes.ok) {
+          alert(temaData.error || 'No se pudo crear el tema');
           return;
         }
 
-        alert(`Tema agregado: ${nombre}`);
-        document.getElementById('temaNombre').value = '';
-        document.getElementById('temaDescripcion').value = '';
+        const preguntaRes = await fetch('http://localhost:3000/api/preguntas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temaId: temaData.id,
+            enunciado: pregunta,
+            opciones,
+            respuestaCorrecta: Number(correcta)
+          })
+        });
+
+        const preguntaData = await preguntaRes.json();
+        if (!preguntaRes.ok) {
+          alert(preguntaData.error || 'No se pudo guardar la pregunta');
+          return;
+        }
+
+        alert('Pregunta guardada correctamente');
+        document.getElementById('temaDocente').value = '';
+        document.getElementById('preguntaDocente').value = '';
+        document.getElementById('opcion1').value = '';
+        document.getElementById('opcion2').value = '';
+        document.getElementById('opcion3').value = '';
+        await cargarTemasDocente();
       } catch (error) {
         alert('No se pudo conectar con el servidor');
       }
-    });
+    }
 
-    document.getElementById('btnAgregarPregunta')?.addEventListener('click', async () => {
-      const tema = document.getElementById('preguntaTema').value.trim();
-      const texto = document.getElementById('preguntaTexto').value.trim();
-      const respuesta = document.getElementById('preguntaRespuesta').value.trim();
-      if (!tema || !texto || !respuesta) {
-        alert('Completá tema, pregunta y respuesta correcta');
+    async function cargarTemasDocente() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaEliminar');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay temas para borrar</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        document.getElementById('temaEliminar').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function cargarTemasDocenteResultados() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaResultados');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay temas para ver resultados</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        document.getElementById('temaResultados').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function borrarTemaDocente() {
+      const select = document.getElementById('temaEliminar');
+      const temaId = select.value;
+
+      if (!temaId) {
+        alert('Seleccioná un tema para borrar');
+        return;
+      }
+
+      if (!confirm('¿Seguro que querés borrar este tema y sus preguntas asociadas?')) {
         return;
       }
 
       try {
-        const temasRes = await fetch(`http://localhost:3000/api/temas?docenteId=${docenteId}`);
-        const temas = await temasRes.json();
-        const temaEncontrado = temas.find(t => t.nombre.toLowerCase() === tema.toLowerCase());
-
-        if (!temaEncontrado) {
-          alert('Primero creá el tema en la base de datos');
-          return;
-        }
-
-        const res = await fetch('http://localhost:3000/api/preguntas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ temaId: temaEncontrado.id, enunciado: texto, respuesta })
+        const res = await fetch(`http://localhost:3000/api/temas/${temaId}`, {
+          method: 'DELETE'
         });
 
         const data = await res.json();
         if (!res.ok) {
-          alert(data.error || 'No se pudo crear la pregunta');
+          alert(data.error || 'No se pudo borrar el tema');
           return;
         }
 
-        alert(`Pregunta agregada al tema: ${tema}`);
-        document.getElementById('preguntaTema').value = '';
-        document.getElementById('preguntaTexto').value = '';
-        document.getElementById('preguntaRespuesta').value = '';
+        alert('Tema borrado correctamente');
+        await cargarTemasDocente();
       } catch (error) {
         alert('No se pudo conectar con el servidor');
       }
-    });
+    }
+
+    async function verResultadosDocente() {
+      const temaId = document.getElementById('temaResultados').value;
+      const contenedor = document.getElementById('contenedorResultadosDocente');
+
+      if (!temaId) {
+        contenedor.innerHTML = '<p>Seleccioná un tema para ver los resultados.</p>';
+        return;
+      }
+
+      contenedor.innerHTML = '<p>Cargando resultados...</p>';
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/respuestas/por-tema/${temaId}`);
+        const resultados = await res.json();
+
+        if (!resultados.length) {
+          contenedor.innerHTML = '<p>No hay respuestas registradas para este tema aún.</p>';
+          return;
+        }
+
+        contenedor.innerHTML = resultados.map(alumno => {
+          const respuestasHtml = alumno.respuestas.map(resp => `
+            <li>${resp.pregunta}: <strong>${resp.resultado}</strong> (${resp.opcion_elegida})</li>
+          `).join('');
+
+          return `
+            <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+              <h3>${alumno.nombre} ${alumno.apellido}</h3>
+              <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
+              <ul>${respuestasHtml}</ul>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        contenedor.innerHTML = '<p>No se pudieron cargar los resultados.</p>';
+      }
+    }
+
+    async function cargarMateriasAlumno() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaSeleccionado');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay materias cargadas</option>';
+          return;
+        }
+
+        const temasUnicos = new Map();
+        const normalizarTemaNombre = (nombre = '') => String(nombre)
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+
+        temas.forEach(tema => {
+          const clave = normalizarTemaNombre(tema.nombre);
+          if (!clave || temasUnicos.has(clave)) return;
+          temasUnicos.set(clave, tema);
+        });
+
+        select.innerHTML = '<option value="">Seleccioná una materia</option>';
+        Array.from(temasUnicos.values())
+          .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))
+          .forEach(tema => {
+            const option = document.createElement('option');
+            option.value = tema.id;
+            option.textContent = tema.nombre;
+            select.appendChild(option);
+          });
+
+        select.onchange = () => {
+          indiceActual = 0;
+          puntaje = 0;
+          respuestas = [];
+          cargarPreguntasPorTema(select.value);
+        };
+      } catch (error) {
+        document.getElementById('temaSeleccionado').innerHTML = '<option value="">No se pudieron cargar las materias</option>';
+      }
+    }
+
+    function verificarOcultamiento() {
+      const hasta = Number(localStorage.getItem(ocultarKey) || 0);
+      if (!hasta || Date.now() >= hasta) {
+        localStorage.removeItem(ocultarKey);
+        return;
+      }
+
+      mostrarMensajeOcultado(hasta);
+    }
+
+    function mostrarMensajeOcultado(hasta) {
+      const contenedor = document.getElementById('preguntasAlumno');
+      const tiempoRestante = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
+      contenedor.innerHTML = `<p>Ya respondiste todas las preguntas. Las volverán a aparecer en ${tiempoRestante} segundos.</p>`;
+
+      setTimeout(() => {
+        if (Date.now() >= hasta) {
+          localStorage.removeItem(ocultarKey);
+          const temaId = document.getElementById('temaSeleccionado').value;
+          if (temaId) {
+            cargarPreguntasPorTema(temaId);
+          }
+        } else {
+          mostrarMensajeOcultado(hasta);
+        }
+      }, 1000);
+    }
+
+    async function cargarPreguntasPorTema(temaId) {
+      const contenedor = document.getElementById('preguntasAlumno');
+      contenedor.innerHTML = '';
+
+      if (!temaId) return;
+
+      if (Number(localStorage.getItem(ocultarKey) || 0) > Date.now()) {
+        verificarOcultamiento();
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}`);
+        const preguntas = await res.json();
+
+        if (!preguntas.length) {
+          contenedor.innerHTML = '<p>No hay preguntas cargadas para esta materia.</p>';
+          return;
+        }
+
+        preguntasActuales = preguntas;
+        indiceActual = 0;
+        puntaje = 0;
+        respuestas = [];
+        renderPreguntaActual();
+      } catch (error) {
+        contenedor.innerHTML = '<p>No se pudieron cargar las preguntas.</p>';
+      }
+    }
+
+    function renderPreguntaActual() {
+      const contenedor = document.getElementById('preguntasAlumno');
+
+      if (!preguntasActuales.length) {
+        contenedor.innerHTML = '<p>No hay preguntas cargadas para esta materia.</p>';
+        return;
+      }
+
+      const pregunta = preguntasActuales[indiceActual];
+      if (!pregunta) return;
+
+      const card = document.createElement('div');
+      card.innerHTML = `
+        <div style="margin-bottom:8px; font-weight:bold;">Puntaje: ${puntaje}</div>
+        <h3>${indiceActual + 1}. ${pregunta.enunciado}</h3>
+        <label><input type="radio" name="pregunta-${pregunta.id}" value="1"> ${pregunta.opcion1}</label><br>
+        <label><input type="radio" name="pregunta-${pregunta.id}" value="2"> ${pregunta.opcion2}</label><br>
+        <label><input type="radio" name="pregunta-${pregunta.id}" value="3"> ${pregunta.opcion3}</label>
+        <p id="resultado-${pregunta.id}" style="margin-top:8px; font-weight:bold;"></p>
+        <button id="btnSiguiente" type="button" style="margin-top:10px;" disabled>Siguiente</button>
+      `;
+
+      const radios = card.querySelectorAll('input[type="radio"]');
+      const botonSiguiente = card.querySelector('#btnSiguiente');
+
+      radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          const resultado = document.getElementById(`resultado-${pregunta.id}`);
+          const seleccionada = Number(radio.value);
+          const correcta = Number(pregunta.correcta);
+          const respuestaExistente = respuestas.find(item => item.id === pregunta.id);
+
+          if (respuestaExistente) {
+            if (respuestaExistente.correcta) {
+              puntaje -= 1;
+            }
+            respuestas = respuestas.filter(item => item.id !== pregunta.id);
+          }
+
+          const esCorrecta = seleccionada === correcta;
+          if (esCorrecta) {
+            puntaje += 1;
+          }
+
+          respuestas.push({ id: pregunta.id, correcta: esCorrecta, seleccion: seleccionada });
+          botonSiguiente.disabled = false;
+
+          if (esCorrecta) {
+            resultado.textContent = 'Correcto';
+            resultado.style.color = 'green';
+          } else {
+            resultado.textContent = 'Incorrecto';
+            resultado.style.color = 'crimson';
+          }
+
+          const resumen = card.querySelector('div');
+          if (resumen) {
+            resumen.textContent = `Puntaje: ${puntaje}`;
+          }
+        });
+      });
+
+      botonSiguiente.addEventListener('click', () => {
+        if (indiceActual < preguntasActuales.length - 1) {
+          indiceActual += 1;
+          renderPreguntaActual();
+        } else {
+          finalizarCuestionario();
+        }
+      });
+
+      contenedor.innerHTML = '';
+      contenedor.appendChild(card);
+    }
+
+    function finalizarCuestionario() {
+      const contenedor = document.getElementById('preguntasAlumno');
+      const hasta = Date.now() + 5 * 60 * 1000;
+      localStorage.setItem(ocultarKey, hasta);
+      contenedor.innerHTML = `
+        <p>Respondiste todas las preguntas.</p>
+        <p>Puntaje final: <strong>${puntaje}</strong></p>
+        <p>Las preguntas se ocultarán por 5 minutos.</p>
+      `;
+      mostrarMensajeOcultado(hasta);
+    }
   </script>
+
 </body>

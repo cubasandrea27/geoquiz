@@ -1,61 +1,57 @@
+
 let rolSeleccionado = 'alumno';
-const STORAGE_KEY = 'geoquizUsers';
-
-function redirectIfLoggedIn() {
-  if (localStorage.getItem('isLoggedIn') === 'true') {
-    window.location.href = 'dashboard.html';
-  }
-}
-
-function getStoredUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch (error) {
-    return {};
-  }
-}
 
 function cambiarRol(btn, rol) {
   document.querySelectorAll('.rol').forEach(b => b.classList.remove('activo'));
   btn.classList.add('activo');
+
   rolSeleccionado = rol;
 
-  const credencialInput = document.getElementById('credencial');
+  const labelCredencial = document.querySelector('label[for="dni"]');
+  const inputCredencial = document.getElementById('dni');
+
   if (rol === 'docente') {
-    credencialInput.placeholder = 'Ingresá tu email';
+    labelCredencial.textContent = 'Email';
+    inputCredencial.type = 'email';
+    inputCredencial.placeholder = 'Ingresá tu email';
+    inputCredencial.value = '';
+    inputCredencial.removeAttribute('maxlength');
+    inputCredencial.removeAttribute('pattern');
+    inputCredencial.removeAttribute('inputmode');
   } else {
-    credencialInput.placeholder = 'Ingresá tu DNI';
+    labelCredencial.textContent = 'DNI';
+    inputCredencial.type = 'text';
+    inputCredencial.placeholder = 'Ingresá tu DNI';
+    inputCredencial.value = '';
+    inputCredencial.setAttribute('maxlength', '8');
+    inputCredencial.setAttribute('pattern', '[0-9]*');
+    inputCredencial.setAttribute('inputmode', 'numeric');
   }
-  credencialInput.value = '';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  redirectIfLoggedIn();
-
-  const btnIngresar = document.getElementById('btnIngresar');
+document.addEventListener("DOMContentLoaded", () => {
+  const btnIngresar = document.getElementById("btnIngresar");
 
   if (!btnIngresar) return;
 
-  btnIngresar.addEventListener('click', () => {
-    const credencial = document.getElementById('credencial').value.trim();
-    const password = document.getElementById('password').value.trim();
+  cambiarRol(document.querySelector('.rol.activo'), 'alumno');
 
-    if (!credencial || !password) {
-      alert('Completá tus datos para ingresar.');
+  btnIngresar.addEventListener("click", async () => {
+    const credencial = document.getElementById("dni").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if (!credencial) {
+      alert(rolSeleccionado === 'docente' ? 'Ingresá tu email' : 'Ingresá tu DNI');
       return;
     }
 
-    const users = getStoredUsers();
-    const key = `${rolSeleccionado}:${credencial.toLowerCase()}`;
-    const user = users[key];
+    if (rolSeleccionado === 'alumno' && !/^[0-9]{8}$/.test(credencial)) {
+      alert('El DNI debe tener exactamente 8 dígitos numéricos.');
+      return;
+    }
 
-    if (user && user.password === password) {
-      localStorage.setItem('rol', user.rol);
-      localStorage.setItem('nombre', `${user.nombre} ${user.apellido}`.trim());
-      localStorage.setItem('userId', user.identifier || '');
-      localStorage.setItem('docenteId', user.identifier || '');
-      localStorage.setItem('isLoggedIn', 'true');
-      window.location.href = 'dashboard.html';
+    if (!password) {
+      alert('Ingresá tu contraseña');
       return;
     }
 
@@ -67,27 +63,26 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { dni: credencial, password }
       : { email: credencial, password };
 
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(async res => {
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || 'No se pudo iniciar sesión.');
-          return;
-        }
-
-        localStorage.setItem('rol', data.rol);
-        localStorage.setItem('nombre', data.nombre || '');
-        localStorage.setItem('userId', data.id || '');
-        localStorage.setItem('docenteId', data.id || '');
-        localStorage.setItem('isLoggedIn', 'true');
-        window.location.href = 'dashboard.html';
-      })
-      .catch(() => {
-        alert('No se pudo conectar con el servidor.');
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Error de ingreso.');
+        return;
+      }
+
+      localStorage.setItem("rol", data.rol);
+      localStorage.setItem("dni", rolSeleccionado === 'alumno' ? credencial : '');
+      localStorage.setItem("email", rolSeleccionado === 'docente' ? credencial : '');
+      localStorage.setItem("nombre", data.nombre || '');
+      window.location.href = "dashboard.html";
+    } catch (error) {
+      alert('No se pudo conectar con el servidor.');
+    }
   });
 });

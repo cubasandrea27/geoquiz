@@ -3,24 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GeoQuiz</title>
+  <title>Proyecto</title>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
+
   <div class="contenedor">
+
     <div class="titulo">
       <h1>GeoQuiz</h1>
     </div>
 
     <div class="caja">
+
       <div class="roles">
-        <button class="rol activo" type="button" onclick="cambiarRol(this, 'alumno')">Alumno</button>
-        <button class="rol" type="button" onclick="cambiarRol(this, 'docente')">Docente</button>
+        <button class="rol activo" onclick="cambiarRol(this, 'alumno')">Alumno</button>
+        <button class="rol" onclick="cambiarRol(this, 'docente')">Docente</button>
       </div>
 
-      <div class="campo">
-        <label for="credencial">DNI / Email</label>
-        <input type="text" id="credencial" placeholder="Ingresá tu DNI o email">
+      <div class="campo" id="campo-credencial">
+        <label for="dni">DNI</label>
+        <input type="text" id="dni" placeholder="Ingresá tu DNI o email">
       </div>
 
       <div class="campo">
@@ -28,14 +31,18 @@
         <input type="password" id="password" placeholder="Ingresá tu contraseña">
       </div>
 
-      <button class="ingresar" id="btnIngresar" type="button">Ingresar</button>
+      <button class="ingresar" id="btnIngresar">Ingresar</button>
 
       <hr>
 
       <div class="links">
         <a href="registro.html">¿No tenés cuenta? Registrate</a>
       </div>
+
     </div>
+
+    <p class="pie">Proyecto</p>
+
   </div>
 
   <script src="../js/script.js"></script>

@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registro - GeoQuiz</title>
+  <title>Registro GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
   <div class="contenedor">
     <div class="titulo">
-      <h1>Registro</h1>
+      <h1>Registro GeoQuiz</h1>
     </div>
 
     <div class="caja">
       <div class="roles">
-        <button class="rol activo" type="button" onclick="cambiarRolRegistro(this, 'alumno')">Alumno</button>
-        <button class="rol" type="button" onclick="cambiarRolRegistro(this, 'docente')">Docente</button>
+        <button class="rol activo" onclick="cambiarRolRegistro(this, 'alumno')">Alumno</button>
+        <button class="rol" onclick="cambiarRolRegistro(this, 'docente')">Docente</button>
       </div>
 
       <div class="campo">
@@ -33,7 +33,7 @@
         <input type="text" id="dni" placeholder="Ingresá tu DNI" inputmode="numeric" pattern="[0-9]*" maxlength="8">
       </div>
 
-      <div class="campo" id="campo-email" style="display:none;">
+      <div class="campo" id="campo-email" style="display: none;">
         <label for="email">Email</label>
         <input type="email" id="email" placeholder="Ingresá tu email">
       </div>
@@ -43,7 +43,7 @@
         <input type="password" id="password" placeholder="Ingresá una contraseña">
       </div>
 
-      <button class="ingresar" id="btnRegistrar" type="button">Registrarme</button>
+      <button class="ingresar" id="btnRegistrar">Registrarme</button>
 
       <hr>
 
@@ -51,6 +51,8 @@
         <a href="index.html">Ya tengo cuenta. Iniciar sesión</a>
       </div>
     </div>
+
+    <p class="pie">Proyecto</p>
   </div>
 
   <script src="../js/registro.js"></script>

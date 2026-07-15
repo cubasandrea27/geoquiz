@@ -2,40 +2,6 @@ const express = require('express');
 const router  = express.Router();
 const pool = require('../utils/db');
 
-router.post('/', async (req, res) => {
-  const { alumnoId, preguntaId, opcionIndex, esCorrecta } = req.body;
-
-  if (!alumnoId || !preguntaId || opcionIndex === undefined) {
-    return res.status(400).json({ error: 'Faltan datos para guardar la respuesta' });
-  }
-
-  try {
-    const [existente] = await pool.query(
-      'SELECT id FROM respuestas WHERE alumno_id = ? AND pregunta_id = ?',
-      [alumnoId, preguntaId]
-    );
-
-    const respuestaTexto = String(opcionIndex);
-    const correcta = esCorrecta ? 1 : 0;
-
-    if (existente.length) {
-      await pool.query(
-        'UPDATE respuestas SET opcion_id = NULL, respuesta_texto = ?, es_correcta = ? WHERE id = ?',
-        [respuestaTexto, correcta, existente[0].id]
-      );
-    } else {
-      await pool.query(
-        'INSERT INTO respuestas (alumno_id, pregunta_id, opcion_id, respuesta_texto, es_correcta) VALUES (?, ?, NULL, ?, ?)',
-        [alumnoId, preguntaId, respuestaTexto, correcta]
-      );
-    }
-
-    res.status(201).json({ message: 'Respuesta guardada' });
-  } catch (error) {
-    res.status(500).json({ error: 'No se pudo guardar la respuesta' });
-  }
-});
-
 router.get('/por-tema/:temaId', async (req, res) => {
   const { temaId } = req.params;
 
@@ -45,18 +11,22 @@ router.get('/por-tema/:temaId', async (req, res) => {
 
   try {
     const [rows] = await pool.query(`
-      SELECT
+      SELECT 
         a.id AS alumno_id,
         a.nombre,
         a.apellido,
         p.id AS pregunta_id,
         p.enunciado AS pregunta,
-        r.respuesta_texto AS opcion_elegida,
-        r.es_correcta,
-        CASE WHEN r.es_correcta = 1 THEN 'correcta' ELSE 'incorrecta' END AS resultado
+        o.texto AS opcion_elegida,
+        o.es_correcta,
+        CASE 
+          WHEN o.es_correcta = 1 THEN 'correcta'
+          ELSE 'incorrecta'
+        END AS resultado
       FROM respuestas r
       JOIN alumnos a ON a.id = r.alumno_id
       JOIN preguntas p ON p.id = r.pregunta_id
+      LEFT JOIN opciones o ON o.id = r.opcion_id
       WHERE p.tema_id = ?
       ORDER BY a.apellido, a.nombre, p.id ASC
     `, [temaId]);

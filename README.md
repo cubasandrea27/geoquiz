@@ -1,8 +1,8 @@
-# 🎯 GeoQuiz
+#  GeoQuiz
 
 Sistema de preguntas interactivo basado en ubicación GPS. Los alumnos responden preguntas según su posición geográfica en tiempo real.
 
-## 📋 Descripción
+##  Descripción
 
 Plataforma web donde el **docente** crea temas, preguntas y coordenadas GPS. Los **alumnos** se autentican y reciben preguntas según la ubicación donde se encuentran físicamente.
 
@@ -17,7 +17,7 @@ Plataforma web donde el **docente** crea temas, preguntas y coordenadas GPS. Los
 | Aguilar Sofia | Documentación |
 | Martinez Alexis | Documentación |
 
-## 🛠️ Stack tecnológico
+##  Stack tecnológico
 
 - **Backend:** Node.js + Express
 - **Base de datos:** MySQL
@@ -31,33 +31,30 @@ Plataforma web donde el **docente** crea temas, preguntas y coordenadas GPS. Los
 geoquiz/
 ├── backend/
 │   ├── src/
-│   │   ├── controllers/
-│   │   ├── models/
 │   │   ├── routes/
-│   │   ├── middlewares/
-│   │   └── utils/
+│   │   │   ├── alumnos.js
+│   │   │   ├── docentes.js
+│   │   │   ├── preguntas.js
+│   │   │   ├── respuestas.js
+│   │   │   ├── temas.js
+│   │   │   └── ubicaciones.js
+│   │   ├── utils/
+│   │   │   ├── auth.js
+│   │   │   └── db.js
+│   │   ├── app.js
+│   │   └── server.js
 │   ├── database/
 │   │   └── geoquiz.sql
 │   ├── .env.example
 │   └── package.json
 ├── frontend/
-│   ├── pages/
-│   ├── components/
-│   └── assets/
-│       ├── css/
-│       ├── js/
-│       └── img/
-├── docs/
-│   ├── casos_de_uso/
-│   ├── diagramas/
-│   │   ├── DER/
-│   │   ├── secuencia/
-│   │   └── clases/
-│   └── manual_usuario/
+│   ├── css/
+│   ├── js/
+│   └── pages/
+├── .gitignore
 └── README.md
-```
 
-## 🚀 Instalación
+## Instalación
 
 ### Requisitos previos
 
@@ -85,7 +82,7 @@ cd backend && npm install
 npm run dev
 ```
 
-## ⚙️ Variables de entorno (.env)
+## Variables de entorno (.env)
 
 ```env
 DB_HOST=localhost
@@ -99,7 +96,7 @@ JWT_SECRET=geoquiz2026
 JWT_EXPIRES_IN=8h
 ```
 
-## 📊 Entidades principales
+##  Entidades principales
 
 | Tabla | Descripción |
 |-------|-------------|
@@ -113,7 +110,7 @@ JWT_EXPIRES_IN=8h
 | `respuestas` | Historial de respuestas de cada alumno |
 | `bloqueos_pregunta` | Oculta preguntas 5 min tras ser respondidas |
 
-## 🔑 Flujo principal
+##  Flujo principal
 
 ```
 Docente crea tema → agrega preguntas + coordenadas → inscribe alumnos
@@ -123,7 +120,7 @@ Alumno se autentica (DNI) → detecta ubicación GPS → ve pregunta del área
                          Responde → se graba → pregunta oculta 5 min
 ```
 
-## 📌 Convenciones de branches
+##  Convenciones de branches
 
 ```
 main                → producción estable
@@ -131,6 +128,6 @@ develop/backend     → equipo backend
 develop/frontend    → equipo frontend
 ```
 
-## 📝 Proyecto académico
+##  Proyecto académico
 
 Prácticas Profesionalizantes
