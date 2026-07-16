@@ -69,8 +69,8 @@
     </div>
 
     <div class="campo">
-      <label for="alumnoId">ID del alumno</label>
-      <input type="number" id="alumnoId" placeholder="Ej: 1">
+      <label for="alumnoDni">DNI del alumno</label>
+      <input type="text" id="alumnoDni" placeholder="Ej: 40123456" maxlength="8" pattern="[0-9]*" inputmode="numeric">
     </div>
 
     <button class="ingresar" id="btnGuardarPregunta">Guardar pregunta</button>
@@ -266,10 +266,15 @@
 
     async function registrarAlumnoATema() {
       const temaId = document.getElementById('temaAlumno').value;
-      const alumnoId = document.getElementById('alumnoId').value.trim();
+      const dni = document.getElementById('alumnoDni').value.trim();
 
-      if (!temaId || !alumnoId) {
-        alert('Seleccioná un tema e ingresá el ID del alumno');
+      if (!temaId || !dni) {
+        alert('Seleccioná un tema e ingresá el DNI del alumno');
+        return;
+      }
+
+      if (!/^[0-9]{7,8}$/.test(dni)) {
+        alert('Ingresá un DNI válido (solo números)');
         return;
       }
 
@@ -277,7 +282,7 @@
         const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ alumnoId })
+          body: JSON.stringify({ dni })
         });
 
         const data = await res.json();
@@ -286,8 +291,8 @@
           return;
         }
 
-        alert('Alumno registrado correctamente en el tema');
-        document.getElementById('alumnoId').value = '';
+        alert(`Alumno ${data.nombre || ''} ${data.apellido || ''} registrado correctamente en el tema`.trim());
+        document.getElementById('alumnoDni').value = '';
       } catch (error) {
         alert('No se pudo conectar con el servidor');
       }
@@ -390,14 +395,14 @@
 
     async function inscribirmeATema() {
       const temaId = document.getElementById('temaInscripcion').value;
-      const alumnoId = localStorage.getItem('userId');
+      const dni = localStorage.getItem('dni');
 
       if (!temaId) {
         alert('Seleccioná un tema para inscribirte');
         return;
       }
 
-      if (!alumnoId) {
+      if (!dni) {
         alert('No se pudo identificar al alumno');
         return;
       }
@@ -406,7 +411,7 @@
         const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ alumnoId })
+          body: JSON.stringify({ dni })
         });
 
         const data = await res.json();

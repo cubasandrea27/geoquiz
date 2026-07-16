@@ -74,19 +74,30 @@ router.post('/', async (req, res) => {
 
 router.post('/:id/alumnos', async (req, res) => {
   const temaId = req.params.id;
-  const { alumnoId } = req.body;
+  const { dni } = req.body;
 
-  if (!temaId || !alumnoId) {
+  if (!temaId || !dni) {
     return res.status(400).json({ error: 'Faltan datos para registrar al alumno' });
   }
 
   try {
-    await pool.query(
-      'INSERT IGNORE INTO tema_alumno (tema_id, alumno_id) VALUES (?, ?)',
-      [temaId, alumnoId]
+    const [alumnos] = await pool.query(
+      'SELECT id, nombre, apellido FROM alumnos WHERE dni = ? AND activo = 1',
+      [dni]
     );
 
-    res.status(201).json({ message: 'Alumno registrado en el tema' });
+    if (!alumnos.length) {
+      return res.status(404).json({ error: 'No existe un alumno activo con ese DNI' });
+    }
+
+    const alumno = alumnos[0];
+
+    await pool.query(
+      'INSERT IGNORE INTO tema_alumno (tema_id, alumno_id) VALUES (?, ?)',
+      [temaId, alumno.id]
+    );
+
+    res.status(201).json({ message: 'Alumno registrado en el tema', id: alumno.id, nombre: alumno.nombre, apellido: alumno.apellido });
   } catch (error) {
     res.status(500).json({ error: 'No se pudo registrar al alumno' });
   }
