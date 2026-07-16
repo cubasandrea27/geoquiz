@@ -8,6 +8,7 @@
 </head>
 <body>
   <h1>GeoQuiz</h1>
+  <button class="ingresar" id="btnCerrarSesion" type="button" style="margin-bottom:16px;">Cerrar sesión</button>
 
   <div id="panel-docente" style="display:none;">
     <h2>Panel Docente</h2>
@@ -60,7 +61,20 @@
       </select>
     </div>
 
+    <div class="campo">
+      <label for="temaAlumno">Registrar alumno a un tema</label>
+      <select id="temaAlumno">
+        <option value="">Cargando temas...</option>
+      </select>
+    </div>
+
+    <div class="campo">
+      <label for="alumnoId">ID del alumno</label>
+      <input type="number" id="alumnoId" placeholder="Ej: 1">
+    </div>
+
     <button class="ingresar" id="btnGuardarPregunta">Guardar pregunta</button>
+    <button class="ingresar" id="btnRegistrarAlumnoTema" type="button" style="margin-top:8px;">Registrar alumno al tema</button>
     <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
     <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
 
@@ -94,13 +108,17 @@
     let puntaje = 0;
     let respuestas = [];
 
+    document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
+
     if (rol === 'docente') {
       document.getElementById('panel-docente').style.display = 'block';
       document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
       document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
       document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
+      document.getElementById('btnRegistrarAlumnoTema').addEventListener('click', registrarAlumnoATema);
       cargarTemasDocente();
       cargarTemasDocenteResultados();
+      cargarTemasParaInscripcion();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
       cargarMateriasAlumno();
@@ -212,6 +230,59 @@
       }
     }
 
+    async function cargarTemasParaInscripcion() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaAlumno');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay temas disponibles</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        document.getElementById('temaAlumno').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function registrarAlumnoATema() {
+      const temaId = document.getElementById('temaAlumno').value;
+      const alumnoId = document.getElementById('alumnoId').value.trim();
+
+      if (!temaId || !alumnoId) {
+        alert('Seleccioná un tema e ingresá el ID del alumno');
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alumnoId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo registrar al alumno');
+          return;
+        }
+
+        alert('Alumno registrado correctamente en el tema');
+        document.getElementById('alumnoId').value = '';
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
+      }
+    }
+
     async function borrarTemaDocente() {
       const select = document.getElementById('temaEliminar');
       const temaId = select.value;
@@ -283,34 +354,33 @@
 
     async function cargarMateriasAlumno() {
       try {
+        const alumnoId = localStorage.getItem('userId');
         const res = await fetch('http://localhost:3000/api/temas');
-        const temas = await res.json();
+        const todosLosTemas = await res.json();
         const select = document.getElementById('temaSeleccionado');
         select.innerHTML = '';
 
-        if (!temas.length) {
-          select.innerHTML = '<option value="">No hay materias cargadas</option>';
+        if (!alumnoId) {
+          select.innerHTML = '<option value="">No se pudo identificar al alumno</option>';
           return;
         }
 
-        const temasUnicos = new Map();
-        const normalizarTemaNombre = (nombre = '') => String(nombre)
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, ' ')
-          .replace(/[^a-z0-9]+/g, ' ')
-          .trim();
+        const temasInscritos = [];
+        for (const tema of todosLosTemas) {
+          const inscripcionRes = await fetch(`http://localhost:3000/api/temas/${tema.id}/alumnos`);
+          const alumnos = await inscripcionRes.json();
+          if (alumnos.some(alumno => String(alumno.id) === String(alumnoId))) {
+            temasInscritos.push(tema);
+          }
+        }
 
-        temas.forEach(tema => {
-          const clave = normalizarTemaNombre(tema.nombre);
-          if (!clave || temasUnicos.has(clave)) return;
-          temasUnicos.set(clave, tema);
-        });
+        if (!temasInscritos.length) {
+          select.innerHTML = '<option value="">No estás inscripto a ningún tema</option>';
+          return;
+        }
 
         select.innerHTML = '<option value="">Seleccioná una materia</option>';
-        Array.from(temasUnicos.values())
+        temasInscritos
           .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))
           .forEach(tema => {
             const option = document.createElement('option');
@@ -370,7 +440,8 @@
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}`);
+        const alumnoId = localStorage.getItem('userId');
+        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}&alumnoId=${alumnoId}`);
         const preguntas = await res.json();
 
         if (!preguntas.length) {
@@ -473,6 +544,18 @@
         <p>Las preguntas se ocultarán por 5 minutos.</p>
       `;
       mostrarMensajeOcultado(hasta);
+    }
+
+    function cerrarSesion() {
+      localStorage.removeItem('rol');
+      localStorage.removeItem('dni');
+      localStorage.removeItem('email');
+      localStorage.removeItem('nombre');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('docenteId');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem(ocultarKey);
+      window.location.href = 'index.html';
     }
   </script>
 

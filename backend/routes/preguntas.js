@@ -4,6 +4,7 @@ const pool = require('../utils/db');
 
 router.get('/', async (req, res) => {
   const temaId = req.query.temaId;
+  const alumnoId = req.query.alumnoId;
 
   if (!temaId) {
     return res.status(400).json({ error: 'Falta el temaId' });
@@ -14,6 +15,17 @@ router.get('/', async (req, res) => {
       'SELECT id, enunciado FROM preguntas WHERE tema_id = ? AND activo = 1 ORDER BY id DESC',
       [temaId]
     );
+
+    if (alumnoId) {
+      const [inscripciones] = await pool.query(
+        'SELECT 1 FROM tema_alumno WHERE tema_id = ? AND alumno_id = ? LIMIT 1',
+        [temaId, alumnoId]
+      );
+
+      if (!inscripciones.length) {
+        return res.status(403).json({ error: 'El alumno no está registrado en este tema' });
+      }
+    }
 
     const preguntasConOpciones = [];
 

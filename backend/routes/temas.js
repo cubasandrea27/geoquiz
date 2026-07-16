@@ -72,6 +72,48 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.post('/:id/alumnos', async (req, res) => {
+  const temaId = req.params.id;
+  const { alumnoId } = req.body;
+
+  if (!temaId || !alumnoId) {
+    return res.status(400).json({ error: 'Faltan datos para registrar al alumno' });
+  }
+
+  try {
+    await pool.query(
+      'INSERT IGNORE INTO tema_alumno (tema_id, alumno_id) VALUES (?, ?)',
+      [temaId, alumnoId]
+    );
+
+    res.status(201).json({ message: 'Alumno registrado en el tema' });
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudo registrar al alumno' });
+  }
+});
+
+router.get('/:id/alumnos', async (req, res) => {
+  const temaId = req.params.id;
+
+  if (!temaId) {
+    return res.status(400).json({ error: 'Falta el id del tema' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT a.id, a.nombre, a.apellido, a.dni
+      FROM tema_alumno ta
+      JOIN alumnos a ON a.id = ta.alumno_id
+      WHERE ta.tema_id = ? AND a.activo = 1
+      ORDER BY a.apellido, a.nombre
+    `, [temaId]);
+
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudieron listar los alumnos del tema' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   const temaId = req.params.id;
 
