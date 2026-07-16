@@ -85,6 +85,14 @@
     <h2>Panel Alumno</h2>
 
     <div class="campo">
+      <label for="temaInscripcion">Inscribirme a un tema</label>
+      <select id="temaInscripcion">
+        <option value="">Cargando temas disponibles...</option>
+      </select>
+    </div>
+    <button class="ingresar" id="btnInscribirme" type="button" style="margin-bottom:16px;">Inscribirme</button>
+
+    <div class="campo">
       <label for="temaSeleccionado">Elegí una materia</label>
       <select id="temaSeleccionado">
         <option value="">Cargando materias...</option>
@@ -121,6 +129,8 @@
       cargarTemasParaInscripcion();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
+      document.getElementById('btnInscribirme').addEventListener('click', inscribirmeATema);
+      cargarTemasDisponiblesParaInscripcion();
       cargarMateriasAlumno();
       verificarOcultamiento();
     }
@@ -349,6 +359,66 @@
         }).join('');
       } catch (error) {
         contenedor.innerHTML = '<p>No se pudieron cargar los resultados.</p>';
+      }
+    }
+
+    async function cargarTemasDisponiblesParaInscripcion() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaInscripcion');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay temas disponibles</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+        temas
+          .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }))
+          .forEach(tema => {
+            const option = document.createElement('option');
+            option.value = tema.id;
+            option.textContent = tema.nombre;
+            select.appendChild(option);
+          });
+      } catch (error) {
+        document.getElementById('temaInscripcion').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function inscribirmeATema() {
+      const temaId = document.getElementById('temaInscripcion').value;
+      const alumnoId = localStorage.getItem('userId');
+
+      if (!temaId) {
+        alert('Seleccioná un tema para inscribirte');
+        return;
+      }
+
+      if (!alumnoId) {
+        alert('No se pudo identificar al alumno');
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alumnoId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo completar la inscripción');
+          return;
+        }
+
+        alert('Te inscribiste correctamente al tema');
+        await cargarMateriasAlumno();
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
       }
     }
 
