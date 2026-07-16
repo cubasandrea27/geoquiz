@@ -3,11 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GeoQuiz</title>
-  <link rel="stylesheet" href="../assets/css/main.css">
+  <title>Proyecto</title>
+  <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
-  <h1>GeoQuiz</h1>
-  <script src="../assets/js/main.js"></script>
+
+  <div class="contenedor">
+
+    <div class="titulo">
+      <h1>GeoQuiz</h1>
+    </div>
+
+    <div class="caja">
+
+      <div class="roles">
+        <button class="rol activo" onclick="cambiarRol(this, 'alumno')">Alumno</button>
+        <button class="rol" onclick="cambiarRol(this, 'docente')">Docente</button>
+      </div>
+
+      <div class="campo" id="campo-credencial">
+        <label for="dni">DNI</label>
+        <input type="text" id="dni" placeholder="Ingresá tu DNI o email">
+      </div>
+
+      <div class="campo">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" placeholder="Ingresá tu contraseña">
+      </div>
+
+      <button class="ingresar" id="btnIngresar">Ingresar</button>
+
+      <hr>
+
+      <div class="links">
+        <a href="registro.html">¿No tenés cuenta? Registrate</a>
+      </div>
+
+    </div>
+
+    <p class="pie">Proyecto</p>
+
+  </div>
+
+  <script src="../js/script.js"></script>
 </body>
 </html>

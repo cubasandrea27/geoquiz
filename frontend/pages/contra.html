@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuiz - Recuperar contraseña</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
+</head>
+<body>
+
+  <div class="contenedor">
+
+    <div class="titulo">
+      <h1>GeoQuiz</h1>
+      <p>Recuperar contraseña</p>
+    </div>
+
+    <div class="caja">
+
+      <div id="paso-pedido">
+        <p style="font-size:13px; color:#5a5248; margin-bottom:18px; line-height:1.5;">
+          Ingresá tu DNI (alumno) o email (docente) y te avisamos los próximos pasos para recuperar el acceso.
+        </p>
+
+        <div class="campo">
+          <label for="credencial-recuperar">DNI o email</label>
+          <input type="text" id="credencial-recuperar" placeholder="Ingresá tu DNI o email">
+        </div>
+
+        <button class="ingresar" id="btnPedirRecuperacion">Enviar</button>
+      </div>
+
+      <div id="paso-confirmacion" style="display:none;">
+        <p style="font-size:14px; color:#2c2c2c; margin-bottom:10px; line-height:1.5;">
+          ✓ Listo. Si los datos coinciden con una cuenta registrada, en breve vas a recibir instrucciones para restablecer tu contraseña.
+        </p>
+        <p style="font-size:12px; color:#7a7060; line-height:1.5;">
+          Si no te llega nada, revisá que el DNI o el email estén bien escritos, o contactate con tu docente.
+        </p>
+      </div>
+
+      <hr>
+
+      <div class="links">
+        <a href="index.html">Volver a iniciar sesión</a>
+      </div>
+
+    </div>
+
+    <p class="pie">Proyecto</p>
+
+  </div>
+
+  <script src="../js/notificaciones.js"></script>
+  <script src="../js/contra.js"></script>
+</body>
+</html>

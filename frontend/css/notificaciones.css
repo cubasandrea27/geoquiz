@@ -1,0 +1,42 @@
+/* Cartelitos de notificación, para usar en vez de alert().
+   Pensado para funcionar arriba de cualquier fondo (claro u oscuro). */
+
+#contenedor-notificaciones {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 360px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.notificacion {
+  background: #22303b;
+  border-left: 4px solid #2364aa;
+  border-radius: 4px;
+  padding: 12px 14px;
+  color: #f0ece2;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.notificacion.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.notificacion-error   { border-left-color: #c0392b; }
+.notificacion-exito   { border-left-color: #4a9d6e; }
+.notificacion-info    { border-left-color: #2364aa; }
