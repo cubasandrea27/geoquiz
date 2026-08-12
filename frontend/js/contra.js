@@ -1,9 +1,4 @@
-/* Recuperar contraseña.
-   NOTA: todavía no existe un endpoint de backend para esto (no está en
-   el README ni en las rutas). Por ahora el flujo queda armado del lado
-   del front y muestra el mensaje de confirmación siempre, sin pegarle
-   a ningún servidor. Cuando exista la ruta (ej: POST /api/alumnos/recuperar),
-   reemplazar el bloque de abajo por un fetch() como los de script.js. */
+
 
 document.addEventListener('DOMContentLoaded', () => {
   const btnPedir = document.getElementById('btnPedirRecuperacion');
@@ -18,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // TODO: reemplazar por fetch() cuando el backend tenga la ruta de recuperación.
     pasoPedido.style.display = 'none';
     pasoConfirmacion.style.display = 'block';
   });
