@@ -150,12 +150,14 @@
         return;
       }
 
-      try {
-        const temaRes = await fetch('http://localhost:3000/api/temas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre: temaNombre, descripcion: 'Materia creada desde el panel docente' })
-        });
+try {
+  const docenteId = localStorage.getItem('docenteId');
+
+  const temaRes = await fetch('http://localhost:3000/api/temas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: temaNombre, descripcion: 'Materia creada desde el panel docente', docenteId })
+  });
 
         const temaData = await temaRes.json();
         if (!temaRes.ok) {
