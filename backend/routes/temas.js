@@ -40,17 +40,35 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/docente/:docenteId', async (req, res) => {
+  const { docenteId } = req.params;
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, nombre, descripcion FROM temas WHERE activo = 1 AND docente_id = ? ORDER BY nombre ASC',
+      [docenteId]
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudieron listar los temas del docente' });
+  }
+});
+
 router.post('/', async (req, res) => {
-  const { nombre, descripcion } = req.body;
+  const { nombre, descripcion, docenteId } = req.body;
   const nombreOriginal = (nombre || '').trim();
 
   if (!nombreOriginal) {
     return res.status(400).json({ error: 'El nombre del tema es obligatorio' });
   }
 
+  if (!docenteId) {
+    return res.status(400).json({ error: 'Se requiere identificación del docente' });
+  }
+
   try {
     const [todosLosTemas] = await pool.query(
-      'SELECT id, nombre FROM temas WHERE activo = 1 ORDER BY id ASC'
+      'SELECT id, nombre FROM temas WHERE activo = 1 AND docente_id = ? ORDER BY id ASC',
+      [docenteId]
     );
 
     const temaExistente = todosLosTemas.find(tema =>
@@ -63,11 +81,12 @@ router.post('/', async (req, res) => {
 
     const [result] = await pool.query(
       'INSERT INTO temas (docente_id, nombre, descripcion) VALUES (?, ?, ?)',
-      [1, nombreOriginal, descripcion || '']
+      [docenteId, nombreOriginal, descripcion || '']
     );
 
-    res.status(201).json({ id: result.insertId, nombre: nombreOriginal });
+    res.status(201).json({ id: result.insertId, nombre: nombreOriginal, descripcion: descripcion || '' });
   } catch (error) {
+    console.error('Error al crear tema:', error);
     res.status(500).json({ error: 'No se pudo crear el tema' });
   }
 });
@@ -122,6 +141,36 @@ router.get('/:id/alumnos', async (req, res) => {
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: 'No se pudieron listar los alumnos del tema' });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  const temaId = req.params.id;
+  const { nombre, descripcion } = req.body;
+  const nombreLimpio = (nombre || '').trim();
+
+  if (!temaId) {
+    return res.status(400).json({ error: 'Falta el id del tema' });
+  }
+
+  if (!nombreLimpio) {
+    return res.status(400).json({ error: 'El nombre del tema es obligatorio' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      'UPDATE temas SET nombre = ?, descripcion = ? WHERE id = ? AND activo = 1',
+      [nombreLimpio, descripcion || '', temaId]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
+    res.json({ message: 'Tema actualizado', id: Number(temaId), nombre: nombreLimpio, descripcion: descripcion || '' });
+  } catch (error) {
+    console.error('Error al actualizar tema:', error);
+    res.status(500).json({ error: 'No se pudo actualizar el tema' });
   }
 });
 
