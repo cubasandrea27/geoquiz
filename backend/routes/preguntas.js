@@ -4,16 +4,42 @@ const pool = require('../utils/db');
 
 router.get('/', async (req, res) => {
   const temaId = req.query.temaId;
+  const lat = req.query.lat ? parseFloat(req.query.lat) : null;
+  const lng = req.query.lng ? parseFloat(req.query.lng) : null;
 
   if (!temaId) {
     return res.status(400).json({ error: 'Falta el temaId' });
   }
 
   try {
-    const [preguntas] = await pool.query(
-      'SELECT id, enunciado FROM preguntas WHERE tema_id = ? AND activo = 1 ORDER BY id DESC',
-      [temaId]
-    );
+    let preguntas;
+
+    if (lat !== null && lng !== null) {
+      [preguntas] = await pool.query(`
+        SELECT p.id, p.enunciado
+        FROM preguntas p
+        WHERE p.tema_id = ? AND p.activo = 1
+          AND (
+            p.ubicacion_id IS NULL
+            OR p.ubicacion_id IN (
+              SELECT u.id
+              FROM ubicaciones u
+              WHERE u.tema_id = ? AND u.activo = 1
+                AND (6371 * ACOS(
+                  COS(RADIANS(?)) * COS(RADIANS(u.latitud))
+                  * COS(RADIANS(u.longitud) - RADIANS(?))
+                  + SIN(RADIANS(?)) * SIN(RADIANS(u.latitud))
+                )) * 1000 <= u.radio_metros
+            )
+          )
+        ORDER BY p.id DESC
+      `, [temaId, temaId, lat, lng, lat]);
+    } else {
+      [preguntas] = await pool.query(
+        'SELECT id, enunciado FROM preguntas WHERE tema_id = ? AND activo = 1 ORDER BY id DESC',
+        [temaId]
+      );
+    }
 
     const preguntasConOpciones = [];
 

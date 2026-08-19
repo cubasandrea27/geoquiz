@@ -65,6 +65,42 @@
     <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
 
     <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
+
+    <h3 style="margin-top:24px;">Ubicaciones GPS</h3>
+
+    <div class="campo">
+      <label for="temaUbicacion">Tema</label>
+      <select id="temaUbicacion">
+        <option value="">Cargando temas...</option>
+      </select>
+    </div>
+
+    <div class="campo">
+      <label for="nombreUbicacion">Nombre de ubicación</label>
+      <input type="text" id="nombreUbicacion" placeholder="Ej: Plaza Central">
+    </div>
+
+    <div class="campo">
+      <label for="latitudUbicacion">Latitud</label>
+      <input type="number" step="any" id="latitudUbicacion" placeholder="Ej: -34.6037">
+    </div>
+
+    <div class="campo">
+      <label for="longitudUbicacion">Longitud</label>
+      <input type="number" step="any" id="longitudUbicacion" placeholder="Ej: -58.3816">
+    </div>
+
+    <div class="campo">
+      <label for="radioUbicacion">Radio (metros)</label>
+      <input type="number" id="radioUbicacion" value="50">
+    </div>
+
+    <input type="hidden" id="ubicacionEditandoId" value="">
+
+    <button class="ingresar" id="btnGuardarUbicacion">Guardar ubicación</button>
+    <button class="ingresar" id="btnCancelarEdicion" type="button" style="margin-top:8px; display:none;">Cancelar edición</button>
+
+    <div id="listaUbicaciones" style="margin-top:16px;"></div>
   </div>
 
   <div id="panel-alumno" style="display:none;">
@@ -93,8 +129,14 @@
       document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
       document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
       document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
+      document.getElementById('btnGuardarUbicacion').addEventListener('click', guardarUbicacion);
+      document.getElementById('btnCancelarEdicion').addEventListener('click', cancelarEdicionUbicacion);
+      document.getElementById('temaUbicacion').addEventListener('change', function () {
+        cargarUbicaciones(this.value);
+      });
       cargarTemasDocente();
       cargarTemasDocenteResultados();
+      cargarTemasUbicacion();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
       cargarMateriasAlumno();
@@ -363,12 +405,34 @@
         return;
       }
 
+      contenedor.innerHTML = '<p>Obteniendo ubicación GPS...</p>';
+
+      let latParam = '';
+      let lngParam = '';
+
       try {
-        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}`);
+        const posicion = await new Promise((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('no geolocation'));
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+        });
+
+        latParam = `&lat=${posicion.coords.latitude}`;
+        lngParam = `&lng=${posicion.coords.longitude}`;
+      } catch (e) {
+        contenedor.innerHTML = '<p>Sin GPS, mostrando todas las preguntas.</p>';
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}${latParam}${lngParam}`);
         const preguntas = await res.json();
 
+        contenedor.innerHTML = '';
+
         if (!preguntas.length) {
-          contenedor.innerHTML = '<p>No hay preguntas cargadas para esta materia.</p>';
+          contenedor.innerHTML = '<p>No hay preguntas disponibles en tu ubicación.</p>';
           return;
         }
 
@@ -468,6 +532,149 @@
       `;
       mostrarMensajeOcultado(hasta);
     }
+
+    async function cargarTemasUbicacion() {
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        const select = document.getElementById('temaUbicacion');
+        select.innerHTML = '';
+
+        if (!temas.length) {
+          select.innerHTML = '<option value="">No hay temas disponibles</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        document.getElementById('temaUbicacion').innerHTML = '<option value="">Error al cargar temas</option>';
+      }
+    }
+
+    async function cargarUbicaciones(temaId) {
+      const contenedor = document.getElementById('listaUbicaciones');
+      contenedor.innerHTML = '';
+
+      if (!temaId) return;
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await res.json();
+
+        if (!ubicaciones.length) {
+          contenedor.innerHTML = '<p>No hay ubicaciones para este tema.</p>';
+          return;
+        }
+
+        contenedor.innerHTML = ubicaciones.map(ub => `
+          <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+            <p><strong>${ub.nombre || 'Sin nombre'}</strong></p>
+            <p>Lat: ${ub.latitud} | Lng: ${ub.longitud} | Radio: ${ub.radio_metros}m</p>
+            <button onclick="editarUbicacion(${ub.id}, '${(ub.nombre || '').replace(/'/g, "\\'")}', ${ub.latitud}, ${ub.longitud}, ${ub.radio_metros})">Editar</button>
+            <button onclick="eliminarUbicacion(${ub.id})">Eliminar</button>
+          </div>
+        `).join('');
+      } catch (error) {
+        contenedor.innerHTML = '<p>Error al cargar ubicaciones.</p>';
+      }
+    }
+
+    async function guardarUbicacion() {
+      const temaId = document.getElementById('temaUbicacion').value;
+      const nombre = document.getElementById('nombreUbicacion').value.trim();
+      const latitud = parseFloat(document.getElementById('latitudUbicacion').value);
+      const longitud = parseFloat(document.getElementById('longitudUbicacion').value);
+      const radio_metros = parseInt(document.getElementById('radioUbicacion').value) || 50;
+      const editandoId = document.getElementById('ubicacionEditandoId').value;
+
+      if (!temaId || isNaN(latitud) || isNaN(longitud)) {
+        alert('Completá tema, latitud y longitud.');
+        return;
+      }
+
+      const body = { temaId, nombre, latitud, longitud, radio_metros };
+
+      try {
+        let res;
+        if (editandoId) {
+          res = await fetch(`http://localhost:3000/api/ubicaciones/${editandoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, latitud, longitud, radio_metros })
+          });
+        } else {
+          res = await fetch('http://localhost:3000/api/ubicaciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+        }
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo guardar la ubicación');
+          return;
+        }
+
+        alert(editandoId ? 'Ubicación actualizada' : 'Ubicación creada');
+        limpiarFormularioUbicacion();
+        await cargarUbicaciones(temaId);
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
+      }
+    }
+
+    function editarUbicacion(id, nombre, latitud, longitud, radio_metros) {
+      document.getElementById('nombreUbicacion').value = nombre;
+      document.getElementById('latitudUbicacion').value = latitud;
+      document.getElementById('longitudUbicacion').value = longitud;
+      document.getElementById('radioUbicacion').value = radio_metros;
+      document.getElementById('ubicacionEditandoId').value = id;
+      document.getElementById('btnCancelarEdicion').style.display = 'block';
+    }
+
+    function cancelarEdicionUbicacion() {
+      limpiarFormularioUbicacion();
+    }
+
+    function limpiarFormularioUbicacion() {
+      document.getElementById('nombreUbicacion').value = '';
+      document.getElementById('latitudUbicacion').value = '';
+      document.getElementById('longitudUbicacion').value = '';
+      document.getElementById('radioUbicacion').value = '50';
+      document.getElementById('ubicacionEditandoId').value = '';
+      document.getElementById('btnCancelarEdicion').style.display = 'none';
+    }
+
+    window.eliminarUbicacion = async function (id) {
+      if (!confirm('¿Seguro que querés eliminar esta ubicación?')) return;
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/ubicaciones/${id}`, {
+          method: 'DELETE'
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'No se pudo eliminar');
+          return;
+        }
+
+        alert('Ubicación eliminada');
+        const temaId = document.getElementById('temaUbicacion').value;
+        if (temaId) await cargarUbicaciones(temaId);
+      } catch (error) {
+        alert('No se pudo conectar con el servidor');
+      }
+    };
+
+    window.editarUbicacion = editarUbicacion;
   </script>
 
 </body>
