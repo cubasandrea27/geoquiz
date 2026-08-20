@@ -25,6 +25,8 @@ body {
   background: var(--bg);
   color: var(--texto);
   font-family: 'Inter', Arial, sans-serif;
+  display: flex;
+  justify-content: center;
 }
 
 .app {
