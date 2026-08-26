@@ -20,7 +20,7 @@ async function register(req, res) {
     res.status(201).json({ message: 'Alumno registrado', id: result.insertId });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'El DNI ya est� registrado' });
+      return res.status(409).json({ error: 'El DNI ya esta registrado' });
     }
     res.status(500).json({ error: 'Error interno' });
   }
