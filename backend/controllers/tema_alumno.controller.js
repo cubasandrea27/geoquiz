@@ -8,9 +8,9 @@ async function inscribirse(req, res) {
   }
 
   try {
-    // Verificar que el alumno existe y tiene una carrera
+    // Verificar que el alumno existe
     const [alumnoRows] = await pool.query(
-      'SELECT id, carrera_id FROM alumnos WHERE id = ? AND activo = 1',
+      'SELECT id FROM alumnos WHERE id = ? AND activo = 1',
       [alumnoId]
     );
     
@@ -18,8 +18,6 @@ async function inscribirse(req, res) {
       return res.status(404).json({ error: 'Alumno no encontrado' });
     }
 
-    const alumno = alumnoRows[0];
-    
     // Verificar que el tema existe
     const [temaRows] = await pool.query(
       'SELECT id FROM temas WHERE id = ? AND activo = 1',
@@ -28,18 +26,6 @@ async function inscribirse(req, res) {
     
     if (temaRows.length === 0) {
       return res.status(404).json({ error: 'Tema no encontrado' });
-    }
-
-    // Verificar que el tema está disponible en la carrera del alumno
-    if (alumno.carrera_id) {
-      const [carreraTemasRows] = await pool.query(
-        'SELECT 1 FROM carrera_tema WHERE carrera_id = ? AND tema_id = ?',
-        [alumno.carrera_id, temaId]
-      );
-      
-      if (carreraTemasRows.length === 0) {
-        return res.status(403).json({ error: 'Este tema no está disponible para tu carrera' });
-      }
     }
 
     // Inscribir al alumno

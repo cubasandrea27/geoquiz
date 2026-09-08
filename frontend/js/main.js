@@ -89,7 +89,7 @@ function wp(n) {
 }
 
 function nombreTema(id) {
-  const t = temas.find((x) => x.id === id);
+  const t = temasDocenteCache.find((x) => x.id === id) || temas.find((x) => x.id === id);
   return t ? t.nombre : '—';
 }
 
@@ -177,8 +177,9 @@ async function renderTemas() {
           <p class="card-titulo">${t.nombre}</p>
           <p class="card-detalle">${t.descripcion || 'Sin descripción'}</p>
         </div>
-        <span class="pill pill-activo">Activo</span>
+        <span class="pill ${t.activo ? 'pill-activo' : 'pill-incorrecta'}">${t.activo ? 'Activo' : 'Inactivo'}</span>
         <div style="display: flex; gap: 8px;">
+          <button class="btn-small" onclick="cambiarEstadoTema(${t.id})">${t.activo ? 'Desactivar' : 'Activar'}</button>
           <button class="btn-small" onclick="editarTema(${t.id})">Editar</button>
           <button class="btn-small btn-danger" onclick="eliminarTema(${t.id})">Eliminar</button>
         </div>
@@ -338,9 +339,32 @@ async function eliminarTema(temaId) {
   }
 }
 
+async function cambiarEstadoTema(temaId) {
+  try {
+    const res = await fetch(`http://localhost:3000/api/temas/${temaId}/estado`, { method: 'PATCH' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'No se pudo cambiar el estado del tema.');
+      return;
+    }
+
+    mostrarSeccion('temas');
+  } catch (error) {
+    alert('Error al conectar con el servidor.');
+  }
+}
+
 async function renderPreguntas() {
   try {
     await cargarTemasDocenteCache();
+
+    const ubicacionesPorTema = await Promise.all(temasDocenteCache.map(async (tema) => {
+      const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${tema.id}`);
+      const ubicacionesTema = await res.json();
+      return Array.isArray(ubicacionesTema) ? ubicacionesTema : [];
+    }));
+    const ubicacionesDocente = ubicacionesPorTema.flat();
 
     const res = await fetch('http://localhost:3000/api/preguntas/todas');
     let preguntasAPI = await res.json();
@@ -386,6 +410,10 @@ async function renderPreguntas() {
 
     const opcionesTemas = temasDocenteCache.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('')
       || '<option value="" disabled>Todavía no creaste ningún tema</option>';
+    const opcionesUbicaciones = ubicacionesDocente.map((ubicacion) => {
+      const tema = temasDocenteCache.find((item) => item.id === ubicacion.tema_id);
+      return `<option value="${ubicacion.id}" data-tema="${ubicacion.tema_id}">${tema ? tema.nombre + ' - ' : ''}${ubicacion.nombre || 'Ubicación ' + ubicacion.id}</option>`;
+    }).join('') || '<option value="" disabled>No hay ubicaciones cargadas</option>';
 
     return `
       <div class="seccion-header">
@@ -412,6 +440,10 @@ async function renderPreguntas() {
           <div>
             <label for="fp-tema">Tema *</label>
             <select id="fp-tema">${opcionesTemas}</select>
+          </div>
+          <div>
+            <label for="fp-ubicacion">Ubicación *</label>
+            <select id="fp-ubicacion">${opcionesUbicaciones}</select>
           </div>
           <div>
             <label for="fp-enunciado">Enunciado de la pregunta *</label>
@@ -485,14 +517,15 @@ async function crearPregunta() {
   }
 
   const temaId = Number(document.getElementById('fp-tema').value);
+  const ubicacionId = Number(document.getElementById('fp-ubicacion').value);
   const enunciado = document.getElementById('fp-enunciado').value.trim();
   const opcion1 = document.getElementById('fp-opcion1').value.trim();
   const opcion2 = document.getElementById('fp-opcion2').value.trim();
   const opcion3 = document.getElementById('fp-opcion3').value.trim();
   const respuestaCorrecta = document.querySelector('input[name="fp-correcta"]:checked').value;
 
-  if (!temaId || !enunciado || !opcion1 || !opcion2 || !opcion3) {
-    alert('Completá el enunciado y todas las 3 opciones.');
+  if (!temaId || !ubicacionId || !enunciado || !opcion1 || !opcion2 || !opcion3) {
+    alert('Completá tema, ubicación, enunciado y las 3 opciones.');
     return;
   }
 
@@ -502,6 +535,7 @@ async function crearPregunta() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         temaId,
+        ubicacionId,
         enunciado,
         opciones: [opcion1, opcion2, opcion3],
         respuestaCorrecta
@@ -644,19 +678,26 @@ async function eliminarPregunta(preguntaId) {
    DOCENTE - Ubicaciones
 ============================================================ */
 
-function renderUbicaciones() {
-  const filas = ubicaciones.map((u) => `
+async function renderUbicaciones() {
+  await cargarTemasDocenteCache();
+  const ubicacionesDocente = (await Promise.all(temasDocenteCache.map(async (tema) => {
+    const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${tema.id}`);
+    const datos = await res.json();
+    return Array.isArray(datos) ? datos : [];
+  }))).flat();
+
+  const filas = ubicacionesDocente.map((u) => `
     <div class="card-item">
       <div class="card-icono acento">${ICONOS.map}</div>
       <div class="card-cuerpo">
-        <p class="card-wp">${wp(u.id)} · ${nombreTema(u.temaId)}</p>
-        <p class="card-titulo">${u.nombre}</p>
-        <p class="card-coord">${u.lat.toFixed(4)}, ${u.lng.toFixed(4)} · radio ${u.radio} m</p>
+        <p class="card-wp">${wp(u.id)} · ${nombreTema(u.tema_id)}</p>
+        <p class="card-titulo">${u.nombre || 'Sin nombre'}</p>
+        <p class="card-coord">${Number(u.latitud).toFixed(4)}, ${Number(u.longitud).toFixed(4)} · radio ${u.radio_metros} m</p>
       </div>
     </div>
   `).join('') || '<p class="vacio">Todavía no cargaste ninguna ubicación.</p>';
 
-  const opcionesTemas = temas.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  const opcionesTemas = temasDocenteCache.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
 
   return `
     <div class="seccion-header">
@@ -704,7 +745,7 @@ function toggleFormUbicacion() {
   mostrarSeccion('ubicaciones');
 }
 
-function crearUbicacion() {
+async function crearUbicacion() {
   const nombre = document.getElementById('fu-nombre').value.trim();
   const lat = parseFloat(document.getElementById('fu-lat').value);
   const lng = parseFloat(document.getElementById('fu-lng').value);
@@ -714,10 +755,31 @@ function crearUbicacion() {
     alert('Completá nombre, latitud, longitud y tema.');
     return;
   }
-  const nuevoId = ubicaciones.length ? Math.max(...ubicaciones.map((u) => u.id)) + 1 : 1;
-  ubicaciones.push({ id: nuevoId, temaId, nombre, lat, lng, radio: isNaN(radio) ? 50 : radio });
-  formUbicacionAbierto = false;
-  mostrarSeccion('ubicaciones');
+  try {
+    const res = await fetch('http://localhost:3000/api/ubicaciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        temaId,
+        nombre,
+        latitud: lat,
+        longitud: lng,
+        radio_metros: isNaN(radio) ? 50 : radio
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo guardar la ubicación.');
+      return;
+    }
+
+    alert('Ubicación guardada correctamente.');
+    formUbicacionAbierto = false;
+    mostrarSeccion('ubicaciones');
+  } catch (error) {
+    alert('Error al conectar con el servidor.');
+  }
 }
 
 /* ============================================================
@@ -822,60 +884,102 @@ function filtrarRespuestas(valor) {
 }
 
 
-function renderPreguntasCercanas() {
-  const yaRespondidas = misRespuestas.map((r) => r.preguntaId);
-  const disponibles = preguntas.filter((p) => !yaRespondidas.includes(p.id));
+function obtenerUbicacionActual() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('El navegador no permite obtener la ubicación.'));
+      return;
+    }
 
-  if (!disponibles.length) {
-    return `
-      <div class="seccion-header">
-        <div>
-          <h2>Preguntas cercanas</h2>
-          <p class="seccion-sub">Estas son las preguntas de los puntos donde estás parado ahora.</p>
-        </div>
-      </div>
-      <p class="vacio">Ya respondiste todas las preguntas cercanas por ahora. Volvé a pasar por acá más tarde.</p>
-    `;
-  }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
+      () => reject(new Error('Necesitamos tu ubicación para mostrar preguntas cercanas.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
 
-  const tarjetas = disponibles.map((p) => `
-    <div class="pregunta-card" id="pregunta-${p.id}">
-      <p class="card-wp">${wp(p.id)} · ${nombreUbicacion(p.ubicacionId)} · dentro del radio</p>
-      <p class="pregunta-enunciado">${p.enunciado}</p>
-      ${p.opciones.map((op, i) => `
-        <button class="opcion" onclick="responderPregunta(${p.id}, ${i})">${op}</button>
-      `).join('')}
-    </div>
-  `).join('');
-
-  return `
+async function renderPreguntasCercanas() {
+  const alumnoId = localStorage.getItem('userId');
+  const encabezado = `
     <div class="seccion-header">
       <div>
         <h2>Preguntas cercanas</h2>
         <p class="seccion-sub">Estas son las preguntas de los puntos donde estás parado ahora.</p>
       </div>
     </div>
-    ${tarjetas}
   `;
+
+  if (!alumnoId) return `${encabezado}<p class="vacio">No se pudo identificar al alumno.</p>`;
+
+  try {
+    const [ubicacion, temasRes] = await Promise.all([
+      obtenerUbicacionActual(),
+      fetch(`http://localhost:3000/api/tema-alumno/alumno/${alumnoId}`)
+    ]);
+    const temasInscritos = await temasRes.json();
+
+    const preguntasPorTema = await Promise.all(temasInscritos.map(async (tema) => {
+      const params = new URLSearchParams({
+        temaId: tema.id,
+        alumnoId,
+        lat: ubicacion.lat,
+        lng: ubicacion.lng
+      });
+      const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
+      if (!res.ok) throw new Error('No se pudieron cargar las preguntas.');
+      const preguntasTema = await res.json();
+      return preguntasTema.map((pregunta) => ({ ...pregunta, temaNombre: tema.nombre }));
+    }));
+
+    const disponibles = preguntasPorTema.flat();
+    if (!disponibles.length) {
+      return `${encabezado}<p class="vacio">No hay preguntas disponibles en tu ubicación. Volvé a intentar más tarde.</p>`;
+    }
+
+    const tarjetas = disponibles.map((p) => `
+      <div class="pregunta-card" id="pregunta-${p.id}">
+        <p class="card-wp">${wp(p.id)} · ${p.temaNombre} · dentro del radio</p>
+        <p class="pregunta-enunciado">${p.enunciado}</p>
+        ${p.opciones.map((opcion) => `
+          <button class="opcion" onclick="responderPregunta(${p.id}, ${opcion.id})">${opcion.texto}</button>
+        `).join('')}
+      </div>
+    `).join('');
+
+    return `${encabezado}${tarjetas}`;
+  } catch (error) {
+    return `${encabezado}<p class="vacio">${error.message}</p>`;
+  }
 }
 
-function responderPregunta(preguntaId, opcionIndex) {
-  const p = preguntas.find((x) => x.id === preguntaId);
-  if (!p) return;
-
-  const esCorrecta = opcionIndex === p.correcta;
+async function responderPregunta(preguntaId, opcionId) {
+  const alumnoId = localStorage.getItem('userId');
   const botones = document.querySelectorAll(`#pregunta-${preguntaId} .opcion`);
-  botones.forEach((btn, i) => {
-    btn.disabled = true;
-    if (i === opcionIndex) btn.classList.add(esCorrecta ? 'correcta' : 'incorrecta');
-    if (i === p.correcta && !esCorrecta) btn.classList.add('correcta');
-  });
+  botones.forEach((btn) => { btn.disabled = true; });
 
-  const ahora = new Date();
-  const fecha = `${String(ahora.getDate()).padStart(2, '0')}/${String(ahora.getMonth() + 1).padStart(2, '0')} ${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-  misRespuestas.push({ preguntaId, correcta: esCorrecta, fecha });
+  try {
+    const ubicacion = await obtenerUbicacionActual();
+    const res = await fetch('http://localhost:3000/api/respuestas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        alumnoId,
+        preguntaId,
+        opcionId,
+        latitud: ubicacion.lat,
+        longitud: ubicacion.lng
+      })
+    });
 
-  setTimeout(() => mostrarSeccion('preguntas-cercanas'), 900);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo registrar la respuesta.');
+    alert(data.esCorrecta ? 'Respuesta correcta.' : 'Respuesta incorrecta.');
+    mostrarSeccion('preguntas-cercanas');
+  } catch (error) {
+    botones.forEach((btn) => { btn.disabled = false; });
+    alert(error.message);
+  }
 }
 
 /* ============================================================

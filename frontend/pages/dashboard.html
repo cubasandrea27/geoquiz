@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
   <h1>GeoQuiz</h1>
@@ -13,9 +14,23 @@
   <div id="panel-docente" style="display:none;">
     <h2>Panel Docente</h2>
 
+    <h3>Crear tema</h3>
+    <div class="campo">
+      <label for="nuevoTemaNombre">Nombre del tema</label>
+      <input type="text" id="nuevoTemaNombre" placeholder="Ej: Historia Argentina">
+    </div>
+    <div class="campo">
+      <label for="nuevoTemaDescripcion">Descripción</label>
+      <input type="text" id="nuevoTemaDescripcion" placeholder="Descripción del tema">
+    </div>
+    <button class="ingresar" id="btnCrearTema" type="button">Crear tema</button>
+    <p id="mensajeTema" style="margin-top:8px;"></p>
+
     <div class="campo">
       <label for="temaDocente">Tema / materia</label>
-      <input type="text" id="temaDocente" placeholder="Ej: Programación, Hardware, Biología">
+      <select id="temaDocente">
+        <option value="">Cargando temas...</option>
+      </select>
     </div>
 
     <div class="campo">
@@ -73,7 +88,41 @@
       <input type="text" id="alumnoDni" placeholder="Ej: 40123456" maxlength="8" pattern="[0-9]*" inputmode="numeric">
     </div>
 
-    <button class="ingresar" id="btnGuardarPregunta">Guardar pregunta</button>
+    <h3>Ubicaciones GPS</h3>
+    <p>Seleccioná un punto en el mapa para cargar sus coordenadas automáticamente.</p>
+    <div id="mapaUbicaciones" style="height:350px; width:100%; margin:12px 0; border:1px solid #ccc;"></div>
+    <button class="ingresar" id="btnUsarUbicacionActual" type="button" style="margin-bottom:8px;">Usar mi ubicación actual</button>
+    <div class="campo">
+      <label for="ubicacionTema">Tema de la ubicación</label>
+      <select id="ubicacionTema">
+        <option value="">Cargando temas...</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="ubicacionExistente">Ubicación existente (opcional)</label>
+      <select id="ubicacionExistente">
+        <option value="">Crear una ubicación nueva</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="ubicacionNombre">Nombre del lugar</label>
+      <input type="text" id="ubicacionNombre" placeholder="Ej: Plaza Central">
+    </div>
+    <div class="campo">
+      <label for="ubicacionLatitud">Latitud</label>
+      <input type="number" id="ubicacionLatitud" step="any" placeholder="Ej: -34.6037">
+    </div>
+    <div class="campo">
+      <label for="ubicacionLongitud">Longitud</label>
+      <input type="number" id="ubicacionLongitud" step="any" placeholder="Ej: -58.3816">
+    </div>
+    <div class="campo">
+      <label for="ubicacionRadio">Radio de detección en metros</label>
+      <input type="number" id="ubicacionRadio" min="1" value="50">
+    </div>
+    <button class="ingresar" id="btnGuardarUbicacion" type="button" style="margin-top:8px;">Guardar ubicación y pregunta</button>
+    <div id="ubicacionesDocente" style="margin-top:16px;"></div>
+
     <button class="ingresar" id="btnRegistrarAlumnoTema" type="button" style="margin-top:8px;">Registrar alumno al tema</button>
     <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
     <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
@@ -102,6 +151,7 @@
     <div id="preguntasAlumno"></div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const rol = localStorage.getItem('rol');
 
@@ -115,18 +165,25 @@
     let indiceActual = 0;
     let puntaje = 0;
     let respuestas = [];
+    let ubicacionAlumno = null;
+    let mapaDocente = null;
+    let marcadorUbicacion = null;
 
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
 
     if (rol === 'docente') {
       document.getElementById('panel-docente').style.display = 'block';
-      document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
       document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
       document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
       document.getElementById('btnRegistrarAlumnoTema').addEventListener('click', registrarAlumnoATema);
+      document.getElementById('btnGuardarUbicacion').addEventListener('click', guardarUbicacionYPreguntaDocente);
+      document.getElementById('btnUsarUbicacionActual').addEventListener('click', usarUbicacionActualDocente);
+      document.getElementById('btnCrearTema').addEventListener('click', crearTemaDocente);
       cargarTemasDocente();
       cargarTemasDocenteResultados();
       cargarTemasParaInscripcion();
+      cargarTemasParaUbicacion();
+      iniciarMapaDocente();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
       document.getElementById('btnInscribirme').addEventListener('click', inscribirmeATema);
@@ -191,6 +248,50 @@ try {
         await cargarTemasDocente();
       } catch (error) {
         alert('No se pudo conectar con el servidor');
+      }
+    }
+
+    async function crearTemaDocente() {
+      const nombre = document.getElementById('nuevoTemaNombre').value.trim();
+      const descripcion = document.getElementById('nuevoTemaDescripcion').value.trim();
+      const mensaje = document.getElementById('mensajeTema');
+      const docenteId = localStorage.getItem('userId');
+
+      if (!nombre) {
+        mensaje.textContent = 'Ingresá el nombre del tema.';
+        mensaje.style.color = 'crimson';
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/temas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, descripcion, docenteId })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          mensaje.textContent = data.error || 'No se pudo crear el tema.';
+          mensaje.style.color = 'crimson';
+          return;
+        }
+
+        mensaje.textContent = `Tema creado: ${data.nombre || nombre}. Ahora podés cargarle una ubicación.`;
+        mensaje.style.color = 'green';
+        document.getElementById('nuevoTemaNombre').value = '';
+        document.getElementById('nuevoTemaDescripcion').value = '';
+        await Promise.all([
+          cargarTemasDocente(),
+          cargarTemasDocenteResultados(),
+          cargarTemasParaInscripcion(),
+          cargarTemasParaUbicacion()
+        ]);
+        document.getElementById('ubicacionTema').value = String(data.id);
+        await cargarUbicacionesDocente();
+      } catch (error) {
+        mensaje.textContent = 'No se pudo conectar con el servidor.';
+        mensaje.style.color = 'crimson';
       }
     }
 
@@ -263,6 +364,269 @@ try {
         });
       } catch (error) {
         document.getElementById('temaAlumno').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function cargarTemasParaUbicacion() {
+      const select = document.getElementById('ubicacionTema');
+
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        select.innerHTML = '<option value="">Seleccioná un tema</option>';
+
+        if (!Array.isArray(temas) || !temas.length) {
+          select.innerHTML = '<option value="">No hay temas activos</option>';
+          return;
+        }
+
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          select.appendChild(option);
+        });
+
+        const temaPregunta = document.getElementById('temaDocente');
+        temaPregunta.innerHTML = select.innerHTML;
+        temaPregunta.addEventListener('change', () => {
+          select.value = temaPregunta.value;
+          cargarUbicacionesDelTema();
+        });
+      } catch (error) {
+        select.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+
+      select.addEventListener('change', cargarUbicacionesDelTema);
+      select.addEventListener('change', () => {
+        const temaPregunta = document.getElementById('temaDocente');
+        if (temaPregunta) temaPregunta.value = select.value;
+      });
+    }
+
+    async function cargarUbicacionesDelTema() {
+      const temaId = document.getElementById('ubicacionTema').value;
+      const select = document.getElementById('ubicacionExistente');
+      select.innerHTML = '<option value="">Crear una ubicación nueva</option>';
+
+      if (!temaId) return;
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await res.json();
+        ubicaciones.forEach(ubicacion => {
+          const option = document.createElement('option');
+          option.value = ubicacion.id;
+          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.latitud}, ${ubicacion.longitud})`;
+          option.dataset.nombre = ubicacion.nombre || '';
+          option.dataset.latitud = ubicacion.latitud;
+          option.dataset.longitud = ubicacion.longitud;
+          option.dataset.radio = ubicacion.radio_metros;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        select.innerHTML = '<option value="">No se pudieron cargar las ubicaciones</option>';
+      }
+    }
+
+    document.addEventListener('change', (evento) => {
+      if (evento.target.id !== 'ubicacionExistente') return;
+      const opcion = evento.target.selectedOptions[0];
+      if (!evento.target.value || !opcion) return;
+      document.getElementById('ubicacionNombre').value = opcion.dataset.nombre;
+      document.getElementById('ubicacionLatitud').value = opcion.dataset.latitud;
+      document.getElementById('ubicacionLongitud').value = opcion.dataset.longitud;
+      document.getElementById('ubicacionRadio').value = opcion.dataset.radio;
+      seleccionarCoordenadas(Number(opcion.dataset.latitud), Number(opcion.dataset.longitud));
+    });
+
+    function iniciarMapaDocente() {
+      if (!window.L || mapaDocente) return;
+
+      mapaDocente = L.map('mapaUbicaciones').setView([-34.6037, -58.3816], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(mapaDocente);
+
+      mapaDocente.on('click', (evento) => {
+        seleccionarCoordenadas(evento.latlng.lat, evento.latlng.lng);
+      });
+
+      setTimeout(() => mapaDocente.invalidateSize(), 100);
+    }
+
+    function seleccionarCoordenadas(latitud, longitud) {
+      document.getElementById('ubicacionLatitud').value = latitud.toFixed(7);
+      document.getElementById('ubicacionLongitud').value = longitud.toFixed(7);
+
+      if (marcadorUbicacion) {
+        marcadorUbicacion.setLatLng([latitud, longitud]);
+      } else {
+        marcadorUbicacion = L.marker([latitud, longitud]).addTo(mapaDocente);
+      }
+
+      marcadorUbicacion.bindPopup('Ubicación seleccionada').openPopup();
+    }
+
+    function usarUbicacionActualDocente() {
+      if (!navigator.geolocation) {
+        alert('Tu navegador no permite obtener la ubicación.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          seleccionarCoordenadas(coords.latitude, coords.longitude);
+          mapaDocente.setView([coords.latitude, coords.longitude], 17);
+        },
+        () => alert('No se pudo obtener tu ubicación actual.'),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    async function guardarUbicacionDocente() {
+      const temaId = document.getElementById('ubicacionTema').value;
+      const nombre = document.getElementById('ubicacionNombre').value.trim();
+      const latitudTexto = document.getElementById('ubicacionLatitud').value.trim().replace(',', '.');
+      const longitudTexto = document.getElementById('ubicacionLongitud').value.trim().replace(',', '.');
+      const radioTexto = document.getElementById('ubicacionRadio').value.trim().replace(',', '.');
+      const latitud = Number(latitudTexto);
+      const longitud = Number(longitudTexto);
+      const radio = Number(radioTexto);
+
+      if (!temaId) {
+        alert('Seleccioná un tema.');
+        return;
+      }
+      if (!nombre) {
+        alert('Ingresá el nombre del lugar.');
+        return;
+      }
+      if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90) {
+        alert('La latitud debe ser un número entre -90 y 90.');
+        return;
+      }
+      if (!Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
+        alert('La longitud debe ser un número entre -180 y 180.');
+        return;
+      }
+      if (!Number.isFinite(radio) || radio <= 0) {
+        alert('El radio debe ser un número mayor a cero, por ejemplo 50.');
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/ubicaciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temaId,
+            nombre,
+            latitud,
+            longitud,
+            radio_metros: radio
+          })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || 'No se pudo guardar la ubicación.');
+          return;
+        }
+
+        alert('Ubicación GPS guardada correctamente.');
+        document.getElementById('ubicacionNombre').value = '';
+        document.getElementById('ubicacionLatitud').value = '';
+        document.getElementById('ubicacionLongitud').value = '';
+        await cargarUbicacionesDocente();
+      } catch (error) {
+        alert('No se pudo conectar con el servidor.');
+      }
+    }
+
+    async function guardarUbicacionYPreguntaDocente() {
+      const temaId = document.getElementById('ubicacionTema').value;
+      const ubicacionId = document.getElementById('ubicacionExistente').value;
+      const nombre = document.getElementById('ubicacionNombre').value.trim();
+      const latitudTexto = document.getElementById('ubicacionLatitud').value.trim().replace(',', '.');
+      const longitudTexto = document.getElementById('ubicacionLongitud').value.trim().replace(',', '.');
+      const radioTexto = document.getElementById('ubicacionRadio').value.trim().replace(',', '.');
+      const latitud = Number(latitudTexto);
+      const longitud = Number(longitudTexto);
+      const radio = Number(radioTexto);
+      const enunciado = document.getElementById('preguntaDocente').value.trim();
+      const opciones = [
+        document.getElementById('opcion1').value.trim(),
+        document.getElementById('opcion2').value.trim(),
+        document.getElementById('opcion3').value.trim()
+      ];
+      const respuestaCorrecta = document.getElementById('respuestaCorrecta').value;
+
+      if (!temaId || !nombre || !Number.isFinite(latitud) || !Number.isFinite(longitud) || !Number.isFinite(radio) || radio <= 0) {
+        alert('Completá tema, nombre, latitud, longitud y radio.');
+        return;
+      }
+
+      if (!enunciado || opciones.some(opcion => !opcion)) {
+        alert('Completá la pregunta y las 3 opciones antes de guardar.');
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/ubicaciones/con-pregunta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temaId,
+            ubicacionId: ubicacionId || null,
+            nombre,
+            latitud,
+            longitud,
+            radio_metros: radio,
+            enunciado,
+            opciones,
+            respuestaCorrecta
+          })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || 'No se pudieron guardar la ubicación y la pregunta.');
+          return;
+        }
+
+        alert('Ubicación y pregunta guardadas correctamente.');
+        document.getElementById('ubicacionNombre').value = '';
+        document.getElementById('ubicacionLatitud').value = '';
+        document.getElementById('ubicacionLongitud').value = '';
+        document.getElementById('preguntaDocente').value = '';
+        document.getElementById('opcion1').value = '';
+        document.getElementById('opcion2').value = '';
+        document.getElementById('opcion3').value = '';
+        await cargarUbicacionesDocente();
+      } catch (error) {
+        alert('No se pudo conectar con el servidor.');
+      }
+    }
+
+    async function cargarUbicacionesDocente() {
+      const contenedor = document.getElementById('ubicacionesDocente');
+      const temaId = document.getElementById('ubicacionTema').value;
+
+      if (!temaId) {
+        contenedor.innerHTML = '';
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await res.json();
+        contenedor.innerHTML = ubicaciones.length
+          ? '<strong>Ubicaciones guardadas:</strong><ul>' + ubicaciones.map(ubicacion => `<li>${ubicacion.nombre || 'Sin nombre'}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)</li>`).join('') + '</ul>'
+          : '<p>No hay ubicaciones para este tema.</p>';
+      } catch (error) {
+        contenedor.innerHTML = '<p>No se pudieron cargar las ubicaciones.</p>';
       }
     }
 
@@ -518,11 +882,19 @@ try {
 
       try {
         const alumnoId = localStorage.getItem('userId');
-        const res = await fetch(`http://localhost:3000/api/preguntas?temaId=${temaId}&alumnoId=${alumnoId}`);
+        ubicacionAlumno = await obtenerUbicacionAlumno();
+        const params = new URLSearchParams({
+          temaId,
+          alumnoId,
+          lat: ubicacionAlumno.latitud,
+          lng: ubicacionAlumno.longitud,
+          precision: ubicacionAlumno.precision
+        });
+        const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
         const preguntas = await res.json();
 
         if (!preguntas.length) {
-          contenedor.innerHTML = '<p>No hay preguntas cargadas para esta materia.</p>';
+          contenedor.innerHTML = '<p>No hay preguntas cercanas a tu ubicación.</p>';
           return;
         }
 
@@ -532,8 +904,23 @@ try {
         respuestas = [];
         renderPreguntaActual();
       } catch (error) {
-        contenedor.innerHTML = '<p>No se pudieron cargar las preguntas.</p>';
+        contenedor.innerHTML = `<p>${error.message || 'No se pudieron cargar las preguntas.'}</p>`;
       }
+    }
+
+    function obtenerUbicacionAlumno() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Tu navegador no permite acceder a la ubicación GPS.'));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => resolve({ latitud: coords.latitude, longitud: coords.longitude, precision: coords.accuracy || 0 }),
+          () => reject(new Error('Debés permitir el acceso a tu ubicación para ver preguntas cercanas.')),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+      });
     }
 
     function renderPreguntaActual() {
@@ -551,9 +938,7 @@ try {
       card.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Puntaje: ${puntaje}</div>
         <h3>${indiceActual + 1}. ${pregunta.enunciado}</h3>
-        <label><input type="radio" name="pregunta-${pregunta.id}" value="1"> ${pregunta.opcion1}</label><br>
-        <label><input type="radio" name="pregunta-${pregunta.id}" value="2"> ${pregunta.opcion2}</label><br>
-        <label><input type="radio" name="pregunta-${pregunta.id}" value="3"> ${pregunta.opcion3}</label>
+        ${pregunta.opciones.map(opcion => `<label><input type="radio" name="pregunta-${pregunta.id}" value="${opcion.id}"> ${opcion.texto}</label><br>`).join('')}
         <p id="resultado-${pregunta.id}" style="margin-top:8px; font-weight:bold;"></p>
         <button id="btnSiguiente" type="button" style="margin-top:10px;" disabled>Siguiente</button>
       `;
@@ -564,41 +949,41 @@ try {
       radios.forEach(radio => {
         radio.addEventListener('change', () => {
           const resultado = document.getElementById(`resultado-${pregunta.id}`);
-          const seleccionada = Number(radio.value);
-          const correcta = Number(pregunta.correcta);
-          const respuestaExistente = respuestas.find(item => item.id === pregunta.id);
-
-          if (respuestaExistente) {
-            if (respuestaExistente.correcta) {
-              puntaje -= 1;
-            }
-            respuestas = respuestas.filter(item => item.id !== pregunta.id);
-          }
-
-          const esCorrecta = seleccionada === correcta;
-          if (esCorrecta) {
-            puntaje += 1;
-          }
-
-          respuestas.push({ id: pregunta.id, correcta: esCorrecta, seleccion: seleccionada });
+          respuestas = respuestas.filter(item => item.id !== pregunta.id);
+          respuestas.push({ id: pregunta.id, opcionId: Number(radio.value) });
           botonSiguiente.disabled = false;
-
-          if (esCorrecta) {
-            resultado.textContent = 'Correcto';
-            resultado.style.color = 'green';
-          } else {
-            resultado.textContent = 'Incorrecto';
-            resultado.style.color = 'crimson';
-          }
-
-          const resumen = card.querySelector('div');
-          if (resumen) {
-            resumen.textContent = `Puntaje: ${puntaje}`;
-          }
+          resultado.textContent = 'Respuesta seleccionada';
+          resultado.style.color = 'inherit';
         });
       });
 
-      botonSiguiente.addEventListener('click', () => {
+      botonSiguiente.addEventListener('click', async () => {
+        const respuesta = respuestas.find(item => item.id === pregunta.id);
+        if (!respuesta) return;
+
+        botonSiguiente.disabled = true;
+        try {
+          const res = await fetch('http://localhost:3000/api/respuestas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              alumnoId: localStorage.getItem('userId'),
+              preguntaId: pregunta.id,
+              opcionId: respuesta.opcionId,
+              latitud: ubicacionAlumno.latitud,
+              longitud: ubicacionAlumno.longitud,
+              precision: ubicacionAlumno.precision
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'No se pudo registrar la respuesta.');
+          puntaje += data.esCorrecta ? 1 : 0;
+        } catch (error) {
+          alert(error.message);
+          botonSiguiente.disabled = false;
+          return;
+        }
+
         if (indiceActual < preguntasActuales.length - 1) {
           indiceActual += 1;
           renderPreguntaActual();

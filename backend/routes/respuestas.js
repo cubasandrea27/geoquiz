@@ -71,34 +71,110 @@ router.get('/docente/:docenteId', async (req, res) => {
 
 // Registrar la respuesta de un alumno a una pregunta.
 router.post('/', async (req, res) => {
-  const { alumnoId, preguntaId, opcionId, latitud, longitud } = req.body;
+  const { alumnoId, preguntaId, opcionId, latitud, longitud, precision } = req.body;
 
   if (!alumnoId || !preguntaId || !opcionId) {
     return res.status(400).json({ error: 'alumnoId, preguntaId y opcionId son requeridos' });
   }
 
+  const lat = Number(latitud);
+  const lng = Number(longitud);
+  const margenGps = Number(precision) > 0 ? Number(precision) : 0;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'Se requiere una ubicación GPS válida' });
+  }
+
+  const connection = await pool.getConnection();
+
   try {
-    const [opciones] = await pool.query(
+    await connection.beginTransaction();
+
+    const [inscripciones] = await connection.query(
+      `SELECT 1 FROM tema_alumno ta
+       JOIN preguntas p ON p.tema_id = ta.tema_id
+       WHERE ta.alumno_id = ? AND p.id = ? LIMIT 1`,
+      [alumnoId, preguntaId]
+    );
+
+    if (!inscripciones.length) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'El alumno no está registrado en el tema de esta pregunta' });
+    }
+
+    const [preguntas] = await connection.query(`
+      SELECT p.id, u.latitud, u.longitud, u.radio_metros
+      FROM preguntas p
+      JOIN temas t ON t.id = p.tema_id AND t.activo = 1
+      JOIN ubicaciones u ON u.id = p.ubicacion_id AND u.activo = 1
+      WHERE p.id = ? AND p.activo = 1
+      LIMIT 1
+    `, [preguntaId]);
+
+    if (!preguntas.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'La pregunta no tiene una ubicación activa' });
+    }
+
+    const preguntaUbicacion = preguntas[0];
+    const [distancias] = await connection.query(`
+      SELECT (6371 * ACOS(LEAST(1, GREATEST(-1,
+        COS(RADIANS(?)) * COS(RADIANS(?))
+        * COS(RADIANS(?) - RADIANS(?))
+        + SIN(RADIANS(?)) * SIN(RADIANS(?))
+      )))) * 1000 AS distancia
+    `, [lat, preguntaUbicacion.latitud, lng, preguntaUbicacion.longitud, lat, preguntaUbicacion.latitud]);
+
+    if (distancias[0].distancia > preguntaUbicacion.radio_metros + margenGps) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'Debés estar dentro del radio de la ubicación para responder' });
+    }
+
+    const [bloqueos] = await connection.query(
+      `SELECT 1 FROM bloqueos_pregunta
+       WHERE alumno_id = ? AND pregunta_id = ? AND bloqueada_hasta > NOW()
+       LIMIT 1`,
+      [alumnoId, preguntaId]
+    );
+
+    if (bloqueos.length) {
+      await connection.rollback();
+      return res.status(409).json({ error: 'Esta pregunta está temporalmente bloqueada' });
+    }
+
+    const [opciones] = await connection.query(
       'SELECT id, es_correcta FROM opciones WHERE id = ? AND pregunta_id = ?',
       [opcionId, preguntaId]
     );
 
     if (!opciones.length) {
+      await connection.rollback();
       return res.status(404).json({ error: 'La opción no pertenece a esa pregunta' });
     }
 
     const esCorrecta = opciones[0].es_correcta ? 1 : 0;
 
-    const [result] = await pool.query(
+    const [result] = await connection.query(
       `INSERT INTO respuestas (alumno_id, pregunta_id, opcion_id, es_correcta, latitud_resp, longitud_resp)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [alumnoId, preguntaId, opcionId, esCorrecta, latitud || null, longitud || null]
+      [alumnoId, preguntaId, opcionId, esCorrecta, lat, lng]
     );
+
+    await connection.query(
+      `INSERT INTO bloqueos_pregunta (alumno_id, pregunta_id, bloqueada_hasta)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))
+       ON DUPLICATE KEY UPDATE bloqueada_hasta = VALUES(bloqueada_hasta)`,
+      [alumnoId, preguntaId]
+    );
+
+    await connection.commit();
 
     res.status(201).json({ message: 'Respuesta registrada', id: result.insertId, esCorrecta: !!esCorrecta });
   } catch (error) {
+    await connection.rollback();
     console.error('Error al registrar respuesta:', error);
     res.status(500).json({ error: 'No se pudo registrar la respuesta' });
+  } finally {
+    connection.release();
   }
 });
 

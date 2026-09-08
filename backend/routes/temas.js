@@ -44,7 +44,7 @@ router.get('/docente/:docenteId', async (req, res) => {
   const { docenteId } = req.params;
   try {
     const [rows] = await pool.query(
-      'SELECT id, nombre, descripcion FROM temas WHERE activo = 1 AND docente_id = ? ORDER BY nombre ASC',
+      'SELECT id, nombre, descripcion, activo FROM temas WHERE docente_id = ? ORDER BY nombre ASC',
       [docenteId]
     );
     res.json(rows);
@@ -171,6 +171,31 @@ router.put('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error al actualizar tema:', error);
     res.status(500).json({ error: 'No se pudo actualizar el tema' });
+  }
+});
+
+router.patch('/:id/estado', async (req, res) => {
+  const temaId = req.params.id;
+
+  try {
+    const [temas] = await pool.query(
+      'SELECT activo FROM temas WHERE id = ?',
+      [temaId]
+    );
+
+    if (!temas.length) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
+    const nuevoEstado = temas[0].activo ? 0 : 1;
+    await pool.query(
+      'UPDATE temas SET activo = ? WHERE id = ?',
+      [nuevoEstado, temaId]
+    );
+
+    res.json({ activo: Boolean(nuevoEstado) });
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudo cambiar el estado del tema' });
   }
 });
 

@@ -152,11 +152,11 @@ CREATE TABLE bloqueos_pregunta (
 -- ============================================================
 
 INSERT INTO docentes (nombre, apellido, email, password) VALUES
-  ('Juan', 'Pérez', 'jperez@escuela.edu', '$2b$10$HASH_EJEMPLO');
+  ('Juan', 'Pérez', 'jperez@escuela.edu', '$2b$10$n5vvqMtYVnYdnN6sTs/zueJsBSQVoLQWR8M/qkbQNj7HGO/kkho7m');
 
 INSERT INTO alumnos (nombre, apellido, dni, password) VALUES
-  ('María', 'García', '12345678', '$2b$10$HASH_EJEMPLO'),
-  ('Carlos', 'López', '87654321', '$2b$10$HASH_EJEMPLO');
+  ('María', 'García', '12345678', '$2b$10$n5vvqMtYVnYdnN6sTs/zueJsBSQVoLQWR8M/qkbQNj7HGO/kkho7m'),
+  ('Carlos', 'López', '87654321', '$2b$10$9unxJEBZPMtmam1VtXb23Oe6TyxR8jtY1.xus/aqPq9oSZ9ZSzWVe');
 
 INSERT INTO temas (docente_id, nombre, descripcion) VALUES
   (1, 'Historia Argentina', 'Preguntas sobre historia nacional');
