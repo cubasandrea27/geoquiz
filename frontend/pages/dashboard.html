@@ -148,6 +148,8 @@
       </select>
     </div>
 
+    <div id="mapaAlumno" style="height:350px; width:100%; margin:12px 0; border:1px solid #ccc; display:none;"></div>
+
     <div id="preguntasAlumno"></div>
   </div>
 
@@ -168,6 +170,9 @@
     let ubicacionAlumno = null;
     let mapaDocente = null;
     let marcadorUbicacion = null;
+    let mapaAlumno = null;
+    let marcadorAlumno = null;
+    let capaUbicacionesAlumno = null;
 
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
 
@@ -873,7 +878,10 @@ try {
       const contenedor = document.getElementById('preguntasAlumno');
       contenedor.innerHTML = '';
 
-      if (!temaId) return;
+      if (!temaId) {
+        document.getElementById('mapaAlumno').style.display = 'none';
+        return;
+      }
 
       if (Number(localStorage.getItem(ocultarKey) || 0) > Date.now()) {
         verificarOcultamiento();
@@ -883,6 +891,15 @@ try {
       try {
         const alumnoId = localStorage.getItem('userId');
         ubicacionAlumno = await obtenerUbicacionAlumno();
+
+        try {
+          const resUbicaciones = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+          const ubicacionesTema = await resUbicaciones.json();
+          mostrarMapaAlumno(Array.isArray(ubicacionesTema) ? ubicacionesTema : []);
+        } catch (errorMapa) {
+          mostrarMapaAlumno([]);
+        }
+
         const params = new URLSearchParams({
           temaId,
           alumnoId,
@@ -921,6 +938,48 @@ try {
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
         );
       });
+    }
+
+    function iniciarMapaAlumno() {
+      if (!window.L || mapaAlumno) return;
+
+      mapaAlumno = L.map('mapaAlumno').setView([-34.6037, -58.3816], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(mapaAlumno);
+
+      capaUbicacionesAlumno = L.layerGroup().addTo(mapaAlumno);
+    }
+
+    function mostrarMapaAlumno(ubicacionesTema) {
+      document.getElementById('mapaAlumno').style.display = 'block';
+      iniciarMapaAlumno();
+      setTimeout(() => mapaAlumno.invalidateSize(), 100);
+
+      capaUbicacionesAlumno.clearLayers();
+      ubicacionesTema.forEach(ubicacion => {
+        L.circle([ubicacion.latitud, ubicacion.longitud], {
+          radius: ubicacion.radio_metros,
+          color: '#3388ff',
+          fillOpacity: 0.15
+        })
+          .bindPopup(ubicacion.nombre || 'Punto del tema')
+          .addTo(capaUbicacionesAlumno);
+      });
+
+      if (ubicacionAlumno) {
+        if (marcadorAlumno) {
+          marcadorAlumno.setLatLng([ubicacionAlumno.latitud, ubicacionAlumno.longitud]);
+        } else {
+          marcadorAlumno = L.marker([ubicacionAlumno.latitud, ubicacionAlumno.longitud])
+            .bindPopup('Tu ubicación')
+            .addTo(mapaAlumno);
+        }
+        mapaAlumno.setView([ubicacionAlumno.latitud, ubicacionAlumno.longitud], 16);
+      } else if (ubicacionesTema.length) {
+        mapaAlumno.setView([ubicacionesTema[0].latitud, ubicacionesTema[0].longitud], 14);
+      }
     }
 
     function renderPreguntaActual() {
