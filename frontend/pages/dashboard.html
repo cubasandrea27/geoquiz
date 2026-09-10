@@ -123,6 +123,15 @@
     <button class="ingresar" id="btnGuardarUbicacion" type="button" style="margin-top:8px;">Guardar ubicación y pregunta</button>
     <div id="ubicacionesDocente" style="margin-top:16px;"></div>
 
+    <h3>Administrar preguntas</h3>
+    <div class="campo">
+      <label for="preguntasTemaFiltro">Tema</label>
+      <select id="preguntasTemaFiltro">
+        <option value="">Seleccioná un tema</option>
+      </select>
+    </div>
+    <div id="preguntasDocente" style="margin-top:16px;"></div>
+
     <button class="ingresar" id="btnRegistrarAlumnoTema" type="button" style="margin-top:8px;">Registrar alumno al tema</button>
     <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
     <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
@@ -160,12 +169,16 @@
       throw new Error('No autenticado');
     }
 
-    const ocultarKey = 'geoquiz_preguntas_ocultas_hasta';
     let preguntasActuales = [];
     let indiceActual = 0;
     let puntaje = 0;
     let respuestas = [];
+    let temaActualId = null;
+    let resumenTemas = {};
+    let preguntasRespondidasTema = {};
     let ubicacionAlumno = null;
+    let intervaloUbicacion = null;
+    let consultaUbicacionEnCurso = false;
     let mapaDocente = null;
     let marcadorUbicacion = null;
 
@@ -183,13 +196,13 @@
       cargarTemasDocenteResultados();
       cargarTemasParaInscripcion();
       cargarTemasParaUbicacion();
+      cargarTemasParaPreguntas();
       iniciarMapaDocente();
     } else {
       document.getElementById('panel-alumno').style.display = 'block';
       document.getElementById('btnInscribirme').addEventListener('click', inscribirmeATema);
       cargarTemasDisponiblesParaInscripcion();
       cargarMateriasAlumno();
-      verificarOcultamiento();
     }
 
     async function guardarPreguntaDocente() {
@@ -404,6 +417,80 @@ try {
       });
     }
 
+    async function cargarTemasParaPreguntas() {
+      const filtro = document.getElementById('preguntasTemaFiltro');
+
+      try {
+        const res = await fetch('http://localhost:3000/api/temas');
+        const temas = await res.json();
+        filtro.innerHTML = '<option value="">Seleccioná un tema</option>';
+
+        temas.forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          filtro.appendChild(option);
+        });
+
+        filtro.addEventListener('change', cargarPreguntasDelTema);
+      } catch (error) {
+        filtro.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    async function cargarPreguntasDelTema() {
+      const temaId = document.getElementById('preguntasTemaFiltro').value;
+      const contenedor = document.getElementById('preguntasDocente');
+
+      if (!temaId) {
+        contenedor.innerHTML = '<p>Seleccioná un tema para administrar sus preguntas.</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/preguntas/todas');
+        const preguntas = await res.json();
+        const preguntasTema = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
+
+        if (!preguntasTema.length) {
+          contenedor.innerHTML = '<p>Este tema no tiene preguntas cargadas.</p>';
+          return;
+        }
+
+        contenedor.innerHTML = preguntasTema.map(pregunta => `
+          <article style="border:1px solid #ccc; padding:12px; margin-bottom:10px;">
+            <p><strong>${pregunta.enunciado}</strong></p>
+            <p>Opciones: ${pregunta.opcion1}, ${pregunta.opcion2}, ${pregunta.opcion3}</p>
+            <p>Respuesta correcta: Opción ${pregunta.correcta}</p>
+            <button type="button" onclick="eliminarPreguntaDocente(${pregunta.id})">Eliminar pregunta</button>
+          </article>
+        `).join('');
+      } catch (error) {
+        contenedor.innerHTML = '<p>No se pudieron cargar las preguntas.</p>';
+      }
+    }
+
+    async function eliminarPreguntaDocente(preguntaId) {
+      if (!confirm('¿Querés eliminar esta pregunta?')) return;
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/preguntas/${preguntaId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || 'No se pudo eliminar la pregunta.');
+          return;
+        }
+
+        alert('Pregunta eliminada correctamente.');
+        cargarPreguntasDelTema();
+      } catch (error) {
+        alert('No se pudo conectar con el servidor.');
+      }
+    }
+
     async function cargarUbicacionesDelTema() {
       const temaId = document.getElementById('ubicacionTema').value;
       const select = document.getElementById('ubicacionExistente');
@@ -457,8 +544,12 @@ try {
     }
 
     function seleccionarCoordenadas(latitud, longitud) {
+      const nombreInput = document.getElementById('ubicacionNombre');
       document.getElementById('ubicacionLatitud').value = latitud.toFixed(7);
       document.getElementById('ubicacionLongitud').value = longitud.toFixed(7);
+      if (!nombreInput.value.trim()) {
+        nombreInput.value = 'Ubicación seleccionada';
+      }
 
       if (marcadorUbicacion) {
         marcadorUbicacion.setLatLng([latitud, longitud]);
@@ -548,13 +639,15 @@ try {
     async function guardarUbicacionYPreguntaDocente() {
       const temaId = document.getElementById('ubicacionTema').value;
       const ubicacionId = document.getElementById('ubicacionExistente').value;
-      const nombre = document.getElementById('ubicacionNombre').value.trim();
+      const opcionUbicacion = document.getElementById('ubicacionExistente').selectedOptions[0];
+      const nombreIngresado = document.getElementById('ubicacionNombre').value.trim();
       const latitudTexto = document.getElementById('ubicacionLatitud').value.trim().replace(',', '.');
       const longitudTexto = document.getElementById('ubicacionLongitud').value.trim().replace(',', '.');
       const radioTexto = document.getElementById('ubicacionRadio').value.trim().replace(',', '.');
-      const latitud = Number(latitudTexto);
-      const longitud = Number(longitudTexto);
-      const radio = Number(radioTexto);
+      const nombre = ubicacionId ? (opcionUbicacion?.dataset.nombre || nombreIngresado) : nombreIngresado;
+      const latitud = ubicacionId ? Number(opcionUbicacion?.dataset.latitud || latitudTexto) : Number(latitudTexto);
+      const longitud = ubicacionId ? Number(opcionUbicacion?.dataset.longitud || longitudTexto) : Number(longitudTexto);
+      const radio = ubicacionId ? Number(opcionUbicacion?.dataset.radio || radioTexto) : Number(radioTexto);
       const enunciado = document.getElementById('preguntaDocente').value.trim();
       const opciones = [
         document.getElementById('opcion1').value.trim(),
@@ -563,8 +656,18 @@ try {
       ];
       const respuestaCorrecta = document.getElementById('respuestaCorrecta').value;
 
-      if (!temaId || !nombre || !Number.isFinite(latitud) || !Number.isFinite(longitud) || !Number.isFinite(radio) || radio <= 0) {
-        alert('Completá tema, nombre, latitud, longitud y radio.');
+      if (!temaId) {
+        alert('Seleccioná un tema.');
+        return;
+      }
+
+      if (!ubicacionId && !nombre) {
+        alert('Ingresá el nombre del lugar o elegí una ubicación existente.');
+        return;
+      }
+
+      if (!Number.isFinite(latitud) || !Number.isFinite(longitud) || !Number.isFinite(radio) || radio <= 0) {
+        alert('Seleccioná una ubicación del mapa o completá latitud, longitud y radio.');
         return;
       }
 
@@ -828,45 +931,27 @@ try {
             option.value = tema.id;
             option.textContent = tema.nombre;
             select.appendChild(option);
+            resumenTemas[tema.id] = resumenTemas[tema.id] || {
+              nombre: tema.nombre,
+              correctas: 0,
+              incorrectas: 0,
+              respondidas: 0
+            };
           });
 
         select.onchange = () => {
+          detenerMonitoreoUbicacion();
+          temaActualId = select.value || null;
           indiceActual = 0;
           puntaje = 0;
           respuestas = [];
-          cargarPreguntasPorTema(select.value);
+          preguntasRespondidasTema[temaActualId] = preguntasRespondidasTema[temaActualId] || new Set();
+          iniciarMonitoreoUbicacion(temaActualId);
+          cargarPreguntasPorTema(temaActualId);
         };
       } catch (error) {
         document.getElementById('temaSeleccionado').innerHTML = '<option value="">No se pudieron cargar las materias</option>';
       }
-    }
-
-    function verificarOcultamiento() {
-      const hasta = Number(localStorage.getItem(ocultarKey) || 0);
-      if (!hasta || Date.now() >= hasta) {
-        localStorage.removeItem(ocultarKey);
-        return;
-      }
-
-      mostrarMensajeOcultado(hasta);
-    }
-
-    function mostrarMensajeOcultado(hasta) {
-      const contenedor = document.getElementById('preguntasAlumno');
-      const tiempoRestante = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
-      contenedor.innerHTML = `<p>Ya respondiste todas las preguntas. Las volverán a aparecer en ${tiempoRestante} segundos.</p>`;
-
-      setTimeout(() => {
-        if (Date.now() >= hasta) {
-          localStorage.removeItem(ocultarKey);
-          const temaId = document.getElementById('temaSeleccionado').value;
-          if (temaId) {
-            cargarPreguntasPorTema(temaId);
-          }
-        } else {
-          mostrarMensajeOcultado(hasta);
-        }
-      }, 1000);
     }
 
     async function cargarPreguntasPorTema(temaId) {
@@ -874,11 +959,6 @@ try {
       contenedor.innerHTML = '';
 
       if (!temaId) return;
-
-      if (Number(localStorage.getItem(ocultarKey) || 0) > Date.now()) {
-        verificarOcultamiento();
-        return;
-      }
 
       try {
         const alumnoId = localStorage.getItem('userId');
@@ -898,13 +978,73 @@ try {
           return;
         }
 
-        preguntasActuales = preguntas;
+        preguntasActuales = filtrarPreguntasRespondidas(preguntas, temaId);
         indiceActual = 0;
         puntaje = 0;
         respuestas = [];
-        renderPreguntaActual();
+        if (preguntasActuales.length) {
+          renderPreguntaActual();
+        } else {
+          finalizarCuestionario();
+        }
       } catch (error) {
         contenedor.innerHTML = `<p>${error.message || 'No se pudieron cargar las preguntas.'}</p>`;
+      }
+    }
+
+    function iniciarMonitoreoUbicacion(temaId) {
+      detenerMonitoreoUbicacion();
+      if (!temaId) return;
+
+      consultarPreguntasCadaTresSegundos(temaId);
+      intervaloUbicacion = setInterval(() => {
+        consultarPreguntasCadaTresSegundos(temaId);
+      }, 3000);
+    }
+
+    function detenerMonitoreoUbicacion() {
+      if (intervaloUbicacion) {
+        clearInterval(intervaloUbicacion);
+        intervaloUbicacion = null;
+      }
+    }
+
+    async function consultarPreguntasCadaTresSegundos(temaId) {
+      if (consultaUbicacionEnCurso || !temaId) return;
+      consultaUbicacionEnCurso = true;
+
+      try {
+        const alumnoId = localStorage.getItem('userId');
+        ubicacionAlumno = await obtenerUbicacionAlumno();
+        const params = new URLSearchParams({
+          temaId,
+          alumnoId,
+          lat: ubicacionAlumno.latitud,
+          lng: ubicacionAlumno.longitud,
+          precision: ubicacionAlumno.precision
+        });
+        const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
+        const preguntas = await res.json();
+        if (!res.ok) throw new Error(preguntas.error || 'No se pudieron consultar las preguntas.');
+
+        preguntas = filtrarPreguntasRespondidas(preguntas, temaId);
+        const idsActuales = preguntasActuales.map(pregunta => pregunta.id).sort().join(',');
+        const idsNuevos = preguntas.map(pregunta => pregunta.id).sort().join(',');
+
+        if (idsActuales !== idsNuevos) {
+          preguntasActuales = preguntas;
+          indiceActual = 0;
+          respuestas = [];
+          if (preguntas.length) {
+            renderPreguntaActual();
+          } else {
+            finalizarCuestionario();
+          }
+        }
+      } catch (error) {
+        console.warn('No se pudo actualizar la ubicación:', error.message);
+      } finally {
+        consultaUbicacionEnCurso = false;
       }
     }
 
@@ -918,7 +1058,7 @@ try {
         navigator.geolocation.getCurrentPosition(
           ({ coords }) => resolve({ latitud: coords.latitude, longitud: coords.longitude, precision: coords.accuracy || 0 }),
           () => reject(new Error('Debés permitir el acceso a tu ubicación para ver preguntas cercanas.')),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       });
     }
@@ -934,6 +1074,8 @@ try {
       const pregunta = preguntasActuales[indiceActual];
       if (!pregunta) return;
 
+      detenerMonitoreoUbicacion();
+
       const card = document.createElement('div');
       card.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Puntaje: ${puntaje}</div>
@@ -945,6 +1087,7 @@ try {
 
       const radios = card.querySelectorAll('input[type="radio"]');
       const botonSiguiente = card.querySelector('#btnSiguiente');
+      let respuestaEnviada = false;
 
       radios.forEach(radio => {
         radio.addEventListener('change', () => {
@@ -960,6 +1103,17 @@ try {
       botonSiguiente.addEventListener('click', async () => {
         const respuesta = respuestas.find(item => item.id === pregunta.id);
         if (!respuesta) return;
+
+        if (respuestaEnviada) {
+          preguntasActuales = preguntasActuales.filter(item => item.id !== pregunta.id);
+          if (preguntasActuales.length) {
+            indiceActual = Math.min(indiceActual, preguntasActuales.length - 1);
+            renderPreguntaActual();
+          } else {
+            finalizarCuestionario();
+          }
+          return;
+        }
 
         botonSiguiente.disabled = true;
         try {
@@ -978,17 +1132,43 @@ try {
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'No se pudo registrar la respuesta.');
           puntaje += data.esCorrecta ? 1 : 0;
+          const resumen = resumenTemas[temaActualId] || {
+            nombre: document.querySelector('#temaSeleccionado option:checked')?.textContent || 'Tema',
+            correctas: 0,
+            incorrectas: 0,
+            respondidas: 0
+          };
+          resumen.respondidas += 1;
+          if (data.esCorrecta) {
+            resumen.correctas += 1;
+          } else {
+            resumen.incorrectas += 1;
+          }
+          resumenTemas[temaActualId] = resumen;
+          preguntasRespondidasTema[temaActualId].add(pregunta.id);
+          respuestaEnviada = true;
+
+          radios.forEach((radio) => {
+            const etiqueta = radio.closest('label');
+            if (Number(radio.value) !== respuesta.opcionId) {
+              etiqueta?.remove();
+            } else {
+              radio.checked = true;
+              radio.disabled = true;
+            }
+          });
+
+          document.getElementById(`resultado-${pregunta.id}`).textContent = data.esCorrecta
+            ? 'Correcto'
+            : 'Incorrecto';
+          document.getElementById(`resultado-${pregunta.id}`).style.color = data.esCorrecta ? 'green' : 'crimson';
+          botonSiguiente.textContent = indiceActual < preguntasActuales.length - 1 ? 'Siguiente' : 'Finalizar';
+          botonSiguiente.disabled = false;
+          return;
         } catch (error) {
           alert(error.message);
           botonSiguiente.disabled = false;
           return;
-        }
-
-        if (indiceActual < preguntasActuales.length - 1) {
-          indiceActual += 1;
-          renderPreguntaActual();
-        } else {
-          finalizarCuestionario();
         }
       });
 
@@ -997,18 +1177,47 @@ try {
     }
 
     function finalizarCuestionario() {
+      detenerMonitoreoUbicacion();
       const contenedor = document.getElementById('preguntasAlumno');
-      const hasta = Date.now() + 5 * 60 * 1000;
-      localStorage.setItem(ocultarKey, hasta);
+      const resumenActual = resumenTemas[temaActualId];
+      const filas = Object.values(resumenTemas)
+        .filter(resumen => resumen.respondidas > 0)
+        .map(resumen => `
+          <tr>
+            <td>${resumen.nombre}</td>
+            <td>${resumen.correctas}</td>
+            <td>${resumen.incorrectas}</td>
+            <td>${resumen.respondidas}</td>
+          </tr>
+        `).join('');
+
       contenedor.innerHTML = `
-        <p>Respondiste todas las preguntas.</p>
-        <p>Puntaje final: <strong>${puntaje}</strong></p>
-        <p>Las preguntas se ocultarán por 5 minutos.</p>
+        <h2>Resumen de respuestas</h2>
+        <p>Terminaste las preguntas disponibles de <strong>${resumenActual?.nombre || 'este tema'}</strong>.</p>
+        <p>Puntaje del tema: <strong>${puntaje}</strong></p>
+        <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Tema</th>
+              <th>Correctas</th>
+              <th>Incorrectas</th>
+              <th>Respondidas</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+        <p style="margin-top:16px;">Podés seleccionar otro tema para continuar.</p>
+        <button type="button" onclick="window.location.href='resultados.html'">Ver mis resultados por materia</button>
       `;
-      mostrarMensajeOcultado(hasta);
+    }
+
+    function filtrarPreguntasRespondidas(preguntas, temaId) {
+      const respondidas = preguntasRespondidasTema[temaId] || new Set();
+      return preguntas.filter(pregunta => !respondidas.has(pregunta.id));
     }
 
     function cerrarSesion() {
+      detenerMonitoreoUbicacion();
       localStorage.removeItem('rol');
       localStorage.removeItem('dni');
       localStorage.removeItem('email');
@@ -1016,7 +1225,6 @@ try {
       localStorage.removeItem('userId');
       localStorage.removeItem('docenteId');
       localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem(ocultarKey);
       window.location.href = 'index.html';
     }
   </script>

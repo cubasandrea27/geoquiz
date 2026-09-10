@@ -167,4 +167,24 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query(
+      'UPDATE preguntas SET activo = 0 WHERE id = ? AND activo = 1',
+      [id]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: 'Pregunta no encontrada' });
+    }
+
+    res.json({ message: 'Pregunta eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar pregunta:', error);
+    res.status(500).json({ error: 'No se pudo eliminar la pregunta' });
+  }
+});
+
 module.exports = router;

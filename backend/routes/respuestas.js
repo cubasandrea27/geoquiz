@@ -2,6 +2,62 @@ const express = require('express');
 const router  = express.Router();
 const pool = require('../utils/db');
 
+router.get('/alumno/:alumnoId', async (req, res) => {
+  const { alumnoId } = req.params;
+
+  if (!alumnoId) {
+    return res.status(400).json({ error: 'Falta el alumnoId' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        t.id AS tema_id,
+        t.nombre AS tema_nombre,
+        p.enunciado AS pregunta,
+        o.texto AS opcion_elegida,
+        r.es_correcta,
+        r.respondida_en
+      FROM respuestas r
+      JOIN preguntas p ON p.id = r.pregunta_id
+      JOIN temas t ON t.id = p.tema_id
+      LEFT JOIN opciones o ON o.id = r.opcion_id
+      WHERE r.alumno_id = ?
+      ORDER BY t.nombre, r.respondida_en ASC
+    `, [alumnoId]);
+
+    const resultados = {};
+
+    rows.forEach(row => {
+      if (!resultados[row.tema_id]) {
+        resultados[row.tema_id] = {
+          tema_id: row.tema_id,
+          tema_nombre: row.tema_nombre,
+          correctas: 0,
+          incorrectas: 0,
+          respuestas: []
+        };
+      }
+
+      const tema = resultados[row.tema_id];
+      const correcta = Boolean(row.es_correcta);
+      tema.correctas += correcta ? 1 : 0;
+      tema.incorrectas += correcta ? 0 : 1;
+      tema.respuestas.push({
+        pregunta: row.pregunta,
+        opcion_elegida: row.opcion_elegida || 'Sin respuesta',
+        resultado: correcta ? 'Correcto' : 'Incorrecto',
+        respondida_en: row.respondida_en
+      });
+    });
+
+    res.json(Object.values(resultados));
+  } catch (error) {
+    console.error('Error al listar resultados del alumno:', error);
+    res.status(500).json({ error: 'No se pudieron listar tus resultados' });
+  }
+});
+
 // Todas las respuestas de los alumnos, agrupadas por alumno, para todos
 // los temas de un docente. Sirve para la sección "Ver respuestas" del
 // panel docente, incluyendo el tema al que pertenece cada pregunta para

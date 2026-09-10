@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis resultados - GeoQuiz</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <main style="max-width:900px; margin:0 auto; padding:24px;">
+    <h1>Mis resultados</h1>
+    <p>Resultados de las materias en las que respondiste preguntas.</p>
+    <div id="estado">Cargando resultados...</div>
+    <button type="button" onclick="window.location.href='dashboard.html'">Volver al panel</button>
+  </main>
+
+  <script>
+    const alumnoId = localStorage.getItem('userId');
+
+    if (localStorage.getItem('rol') !== 'alumno' || localStorage.getItem('isLoggedIn') !== 'true' || !alumnoId) {
+      window.location.href = 'index.html';
+    }
+
+    async function cargarResultados() {
+      const estado = document.getElementById('estado');
+
+      try {
+        const res = await fetch(`http://localhost:3000/api/respuestas/alumno/${alumnoId}`);
+        const resultados = await res.json();
+
+        if (!res.ok) {
+          throw new Error(resultados.error || 'No se pudieron cargar los resultados.');
+        }
+
+        if (!resultados.length) {
+          estado.innerHTML = '<p>Todavia no respondiste preguntas.</p>';
+          return;
+        }
+
+        estado.innerHTML = resultados.map(tema => `
+          <section style="margin:20px 0; padding:16px; border:1px solid #ccc;">
+            <h2>${tema.tema_nombre}</h2>
+            <p><strong>Puntaje:</strong> ${tema.correctas} de ${tema.correctas + tema.incorrectas}</p>
+            <p><strong>Correctas:</strong> ${tema.correctas} | <strong>Incorrectas:</strong> ${tema.incorrectas}</p>
+            <ul>
+              ${tema.respuestas.map(respuesta => `
+                <li style="margin:8px 0;">
+                  ${respuesta.pregunta}<br>
+                  <strong>Respuesta:</strong> ${respuesta.opcion_elegida}
+                  <span style="color:${respuesta.resultado === 'Correcto' ? 'green' : 'crimson'};">(${respuesta.resultado})</span>
+                </li>
+              `).join('')}
+            </ul>
+          </section>
+        `).join('');
+      } catch (error) {
+        estado.innerHTML = `<p>${error.message}</p>`;
+      }
+    }
+
+    cargarResultados();
+  </script>
+</body>
+</html>
