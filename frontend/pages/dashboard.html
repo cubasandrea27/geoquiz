@@ -161,6 +161,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/config.js"></script>
   <script>
     const rol = localStorage.getItem('rol');
 
@@ -181,6 +182,7 @@
     let consultaUbicacionEnCurso = false;
     let mapaDocente = null;
     let marcadorUbicacion = null;
+    let capaUbicacionesGuardadas = null;
 
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
 
@@ -223,7 +225,7 @@
 try {
   const docenteId = localStorage.getItem('docenteId');
 
-  const temaRes = await fetch('http://localhost:3000/api/temas', {
+  const temaRes = await fetch(`${API_BASE}/api/temas`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nombre: temaNombre, descripcion: 'Materia creada desde el panel docente', docenteId })
@@ -235,7 +237,7 @@ try {
           return;
         }
 
-        const preguntaRes = await fetch('http://localhost:3000/api/preguntas', {
+        const preguntaRes = await fetch(`${API_BASE}/api/preguntas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,7 +279,7 @@ try {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/temas', {
+        const res = await fetch(`${API_BASE}/api/temas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, descripcion, docenteId })
@@ -310,7 +312,7 @@ try {
 
     async function cargarTemasDocente() {
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaEliminar');
         select.innerHTML = '';
@@ -334,7 +336,7 @@ try {
 
     async function cargarTemasDocenteResultados() {
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaResultados');
         select.innerHTML = '';
@@ -358,7 +360,7 @@ try {
 
     async function cargarTemasParaInscripcion() {
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaAlumno');
         select.innerHTML = '';
@@ -384,7 +386,7 @@ try {
       const select = document.getElementById('ubicacionTema');
 
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         select.innerHTML = '<option value="">Seleccioná un tema</option>';
 
@@ -405,15 +407,23 @@ try {
         temaPregunta.addEventListener('change', () => {
           select.value = temaPregunta.value;
           cargarUbicacionesDelTema();
+          cargarUbicacionesDocente();
         });
       } catch (error) {
         select.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
       }
 
       select.addEventListener('change', cargarUbicacionesDelTema);
+      select.addEventListener('change', cargarUbicacionesDocente);
       select.addEventListener('change', () => {
         const temaPregunta = document.getElementById('temaDocente');
         if (temaPregunta) temaPregunta.value = select.value;
+
+        const filtroPreguntas = document.getElementById('preguntasTemaFiltro');
+        if (filtroPreguntas && filtroPreguntas.value !== select.value) {
+          filtroPreguntas.value = select.value;
+          cargarPreguntasDelTema();
+        }
       });
     }
 
@@ -421,7 +431,7 @@ try {
       const filtro = document.getElementById('preguntasTemaFiltro');
 
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         filtro.innerHTML = '<option value="">Seleccioná un tema</option>';
 
@@ -442,13 +452,20 @@ try {
       const temaId = document.getElementById('preguntasTemaFiltro').value;
       const contenedor = document.getElementById('preguntasDocente');
 
+      const selectUbicacion = document.getElementById('ubicacionTema');
+      if (selectUbicacion && selectUbicacion.value !== temaId) {
+        selectUbicacion.value = temaId;
+      }
+      await cargarUbicacionesDelTema();
+      await cargarUbicacionesDocente();
+
       if (!temaId) {
         contenedor.innerHTML = '<p>Seleccioná un tema para administrar sus preguntas.</p>';
         return;
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/preguntas/todas');
+        const res = await fetch(`${API_BASE}/api/preguntas/todas`);
         const preguntas = await res.json();
         const preguntasTema = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
 
@@ -474,7 +491,7 @@ try {
       if (!confirm('¿Querés eliminar esta pregunta?')) return;
 
       try {
-        const res = await fetch(`http://localhost:3000/api/preguntas/${preguntaId}`, {
+        const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
           method: 'DELETE'
         });
         const data = await res.json();
@@ -499,7 +516,7 @@ try {
       if (!temaId) return;
 
       try {
-        const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
         const ubicaciones = await res.json();
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
@@ -535,6 +552,8 @@ try {
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19
       }).addTo(mapaDocente);
+
+      capaUbicacionesGuardadas = L.layerGroup().addTo(mapaDocente);
 
       mapaDocente.on('click', (evento) => {
         seleccionarCoordenadas(evento.latlng.lat, evento.latlng.lng);
@@ -608,7 +627,7 @@ try {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/ubicaciones', {
+        const res = await fetch(`${API_BASE}/api/ubicaciones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -677,7 +696,7 @@ try {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/ubicaciones/con-pregunta', {
+        const res = await fetch(`${API_BASE}/api/ubicaciones/con-pregunta`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -717,19 +736,70 @@ try {
       const contenedor = document.getElementById('ubicacionesDocente');
       const temaId = document.getElementById('ubicacionTema').value;
 
+      if (capaUbicacionesGuardadas) {
+        capaUbicacionesGuardadas.clearLayers();
+      }
+
       if (!temaId) {
         contenedor.innerHTML = '';
         return;
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${temaId}`);
+        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
         const ubicaciones = await res.json();
+
+        if (mapaDocente && capaUbicacionesGuardadas) {
+          ubicaciones.forEach(ubicacion => {
+            const marcador = L.marker([ubicacion.latitud, ubicacion.longitud]).addTo(capaUbicacionesGuardadas);
+            const popup = document.createElement('div');
+            popup.innerHTML = `
+              <strong>${ubicacion.nombre || 'Sin nombre'}</strong><br>
+              ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)<br>
+              <button type="button" class="ingresar" style="margin-top:6px;">Eliminar ubicación</button>
+            `;
+            popup.querySelector('button').addEventListener('click', () => eliminarUbicacionDocente(ubicacion.id));
+            marcador.bindPopup(popup);
+          });
+        }
+
         contenedor.innerHTML = ubicaciones.length
-          ? '<strong>Ubicaciones guardadas:</strong><ul>' + ubicaciones.map(ubicacion => `<li>${ubicacion.nombre || 'Sin nombre'}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)</li>`).join('') + '</ul>'
+          ? '<strong>Ubicaciones guardadas:</strong><ul>' + ubicaciones.map(ubicacion => `
+              <li>
+                ${ubicacion.nombre || 'Sin nombre'}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)
+                <button type="button" onclick="eliminarUbicacionDocente(${ubicacion.id})" style="margin-left:8px;">Eliminar</button>
+              </li>
+            `).join('') + '</ul>'
           : '<p>No hay ubicaciones para este tema.</p>';
       } catch (error) {
         contenedor.innerHTML = '<p>No se pudieron cargar las ubicaciones.</p>';
+      }
+    }
+
+    async function eliminarUbicacionDocente(ubicacionId) {
+      if (!confirm('¿Querés eliminar esta ubicación? Las preguntas ya creadas con ella quedarán sin esa referencia en el mapa.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || 'No se pudo eliminar la ubicación.');
+          return;
+        }
+
+        if (mapaDocente) {
+          mapaDocente.closePopup();
+        }
+
+        await cargarUbicacionesDocente();
+        await cargarUbicacionesDelTema();
+      } catch (error) {
+        alert('No se pudo conectar con el servidor.');
       }
     }
 
@@ -748,7 +818,7 @@ try {
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
+        const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dni })
@@ -781,7 +851,7 @@ try {
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/temas/${temaId}`, {
+        const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
           method: 'DELETE'
         });
 
@@ -810,7 +880,7 @@ try {
       contenedor.innerHTML = '<p>Cargando resultados...</p>';
 
       try {
-        const res = await fetch(`http://localhost:3000/api/respuestas/por-tema/${temaId}`);
+        const res = await fetch(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
         const resultados = await res.json();
 
         if (!resultados.length) {
@@ -838,7 +908,7 @@ try {
 
     async function cargarTemasDisponiblesParaInscripcion() {
       try {
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaInscripcion');
         select.innerHTML = '';
@@ -877,7 +947,7 @@ try {
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/temas/${temaId}/alumnos`, {
+        const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dni })
@@ -899,7 +969,7 @@ try {
     async function cargarMateriasAlumno() {
       try {
         const alumnoId = localStorage.getItem('userId');
-        const res = await fetch('http://localhost:3000/api/temas');
+        const res = await fetch(`${API_BASE}/api/temas`);
         const todosLosTemas = await res.json();
         const select = document.getElementById('temaSeleccionado');
         select.innerHTML = '';
@@ -911,7 +981,7 @@ try {
 
         const temasInscritos = [];
         for (const tema of todosLosTemas) {
-          const inscripcionRes = await fetch(`http://localhost:3000/api/temas/${tema.id}/alumnos`);
+          const inscripcionRes = await fetch(`${API_BASE}/api/temas/${tema.id}/alumnos`);
           const alumnos = await inscripcionRes.json();
           if (alumnos.some(alumno => String(alumno.id) === String(alumnoId))) {
             temasInscritos.push(tema);
@@ -970,7 +1040,7 @@ try {
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
+        const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
         const preguntas = await res.json();
 
         if (!preguntas.length) {
@@ -1023,7 +1093,7 @@ try {
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
+        const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
         const preguntas = await res.json();
         if (!res.ok) throw new Error(preguntas.error || 'No se pudieron consultar las preguntas.');
 
@@ -1117,7 +1187,7 @@ try {
 
         botonSiguiente.disabled = true;
         try {
-          const res = await fetch('http://localhost:3000/api/respuestas', {
+          const res = await fetch(`${API_BASE}/api/respuestas`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

@@ -78,8 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const url = rolSeleccionado === 'alumno'
-      ? 'http://localhost:3000/api/alumnos/login'
-      : 'http://localhost:3000/api/docentes/login';
+      ? `${API_BASE}/api/alumnos/login`
+      : `${API_BASE}/api/docentes/login`;
 
     const body = rolSeleccionado === 'alumno'
       ? { dni: credencial, password }

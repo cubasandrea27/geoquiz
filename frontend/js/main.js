@@ -74,7 +74,7 @@ async function cargarTemasDocenteCache() {
     return temasDocenteCache;
   }
   try {
-    const res = await fetch(`http://localhost:3000/api/temas/docente/${docenteId}`);
+    const res = await fetch(`${API_BASE}/api/temas/docente/${docenteId}`);
     const data = await res.json();
     temasDocenteCache = Array.isArray(data) ? data : [];
   } catch (error) {
@@ -244,7 +244,7 @@ async function crearTema() {
 
   try {
     if (temaEnEdicion) {
-      const res = await fetch(`http://localhost:3000/api/temas/${temaEnEdicion.id}`, {
+      const res = await fetch(`${API_BASE}/api/temas/${temaEnEdicion.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre, descripcion: desc })
@@ -263,7 +263,7 @@ async function crearTema() {
       return;
     }
 
-    const res = await fetch('http://localhost:3000/api/temas', {
+    const res = await fetch(`${API_BASE}/api/temas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -321,7 +321,7 @@ async function eliminarTema(temaId) {
   if (!confirm('¿Estás seguro de que querés eliminar este tema? También se ocultarán sus preguntas.')) return;
 
   try {
-    const res = await fetch(`http://localhost:3000/api/temas/${temaId}`, {
+    const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
       method: 'DELETE'
     });
 
@@ -341,7 +341,7 @@ async function eliminarTema(temaId) {
 
 async function cambiarEstadoTema(temaId) {
   try {
-    const res = await fetch(`http://localhost:3000/api/temas/${temaId}/estado`, { method: 'PATCH' });
+    const res = await fetch(`${API_BASE}/api/temas/${temaId}/estado`, { method: 'PATCH' });
     const data = await res.json();
 
     if (!res.ok) {
@@ -360,13 +360,13 @@ async function renderPreguntas() {
     await cargarTemasDocenteCache();
 
     const ubicacionesPorTema = await Promise.all(temasDocenteCache.map(async (tema) => {
-      const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${tema.id}`);
+      const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${tema.id}`);
       const ubicacionesTema = await res.json();
       return Array.isArray(ubicacionesTema) ? ubicacionesTema : [];
     }));
     const ubicacionesDocente = ubicacionesPorTema.flat();
 
-    const res = await fetch('http://localhost:3000/api/preguntas/todas');
+    const res = await fetch(`${API_BASE}/api/preguntas/todas`);
     let preguntasAPI = await res.json();
 
     if (!Array.isArray(preguntasAPI)) {
@@ -530,7 +530,7 @@ async function crearPregunta() {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/preguntas', {
+    const res = await fetch(`${API_BASE}/api/preguntas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -559,7 +559,7 @@ async function crearPregunta() {
 
 async function editarPregunta(preguntaId) {
   // Obtener datos de la pregunta
-  const res = await fetch('http://localhost:3000/api/preguntas/todas');
+  const res = await fetch(`${API_BASE}/api/preguntas/todas`);
   const preguntasAPI = await res.json();
   const pregunta = preguntasAPI.find(p => p.id === preguntaId);
 
@@ -606,7 +606,7 @@ async function guardarEdicionPregunta() {
 
   try {
     // Actualizar enunciado
-    const resEnunciado = await fetch(`http://localhost:3000/api/preguntas/${preguntaEnEdicion.id}`, {
+    const resEnunciado = await fetch(`${API_BASE}/api/preguntas/${preguntaEnEdicion.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enunciado })
@@ -624,7 +624,7 @@ async function guardarEdicionPregunta() {
       const opcionId = preguntaEnEdicion.opciones[i]?.id;
 
       if (opcionId) {
-        const resOpcion = await fetch(`http://localhost:3000/api/preguntas/${preguntaEnEdicion.id}/opciones/${opcionId}`, {
+        const resOpcion = await fetch(`${API_BASE}/api/preguntas/${preguntaEnEdicion.id}/opciones/${opcionId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ texto: opcion, esCorrecta })
@@ -657,7 +657,7 @@ async function eliminarPregunta(preguntaId) {
   if (!confirm('¿Estás seguro de que querés eliminar esta pregunta?')) return;
 
   try {
-    const res = await fetch(`http://localhost:3000/api/preguntas/${preguntaId}`, {
+    const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
       method: 'DELETE'
     });
 
@@ -681,7 +681,7 @@ async function eliminarPregunta(preguntaId) {
 async function renderUbicaciones() {
   await cargarTemasDocenteCache();
   const ubicacionesDocente = (await Promise.all(temasDocenteCache.map(async (tema) => {
-    const res = await fetch(`http://localhost:3000/api/ubicaciones?temaId=${tema.id}`);
+    const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${tema.id}`);
     const datos = await res.json();
     return Array.isArray(datos) ? datos : [];
   }))).flat();
@@ -756,7 +756,7 @@ async function crearUbicacion() {
     return;
   }
   try {
-    const res = await fetch('http://localhost:3000/api/ubicaciones', {
+    const res = await fetch(`${API_BASE}/api/ubicaciones`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -791,7 +791,7 @@ async function renderRespuestas() {
     await cargarTemasDocenteCache();
     const docenteId = localStorage.getItem('userId');
 
-    const res = await fetch(`http://localhost:3000/api/respuestas/docente/${docenteId}`);
+    const res = await fetch(`${API_BASE}/api/respuestas/docente/${docenteId}`);
     const respuestasAPI = await res.json();
 
     if (!Array.isArray(respuestasAPI)) {
@@ -915,7 +915,7 @@ async function renderPreguntasCercanas() {
   try {
     const [ubicacion, temasRes] = await Promise.all([
       obtenerUbicacionActual(),
-      fetch(`http://localhost:3000/api/tema-alumno/alumno/${alumnoId}`)
+      fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`)
     ]);
     const temasInscritos = await temasRes.json();
 
@@ -926,7 +926,7 @@ async function renderPreguntasCercanas() {
         lat: ubicacion.lat,
         lng: ubicacion.lng
       });
-      const res = await fetch(`http://localhost:3000/api/preguntas?${params}`);
+      const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
       if (!res.ok) throw new Error('No se pudieron cargar las preguntas.');
       const preguntasTema = await res.json();
       return preguntasTema.map((pregunta) => ({ ...pregunta, temaNombre: tema.nombre }));
@@ -960,7 +960,7 @@ async function responderPregunta(preguntaId, opcionId) {
 
   try {
     const ubicacion = await obtenerUbicacionActual();
-    const res = await fetch('http://localhost:3000/api/respuestas', {
+    const res = await fetch(`${API_BASE}/api/respuestas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1032,7 +1032,7 @@ async function renderMisTemas() {
   }
 
   try {
-    const res = await fetch(`http://localhost:3000/api/tema-alumno/alumno/${userId}`);
+    const res = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
     const temasInscritos = await res.json();
 
     if (!temasInscritos.length) {
@@ -1113,11 +1113,11 @@ async function renderMateriasDisponibles() {
 
   try {
     // Obtener temas disponibles para la carrera
-    const resCarrera = await fetch(`http://localhost:3000/api/carreras/${carreraId}/temas`);
+    const resCarrera = await fetch(`${API_BASE}/api/carreras/${carreraId}/temas`);
     const temasCarrera = await resCarrera.json();
 
     // Obtener temas en los que ya estoy inscrito
-    const resInscripciones = await fetch(`http://localhost:3000/api/tema-alumno/alumno/${userId}`);
+    const resInscripciones = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
     const temasInscritos = await resInscripciones.json();
     const idsTemasInscritos = temasInscritos.map(t => t.id);
 
@@ -1190,7 +1190,7 @@ async function inscribirseAlTema(temaId) {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/tema-alumno', {
+    const res = await fetch(`${API_BASE}/api/tema-alumno`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ alumnoId: userId, temaId })

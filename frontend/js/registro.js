@@ -46,8 +46,8 @@ async function registrarUsuario() {
   }
 
   const url = rolSeleccionado === 'alumno'
-    ? 'http://localhost:3000/api/alumnos/register'
-    : 'http://localhost:3000/api/docentes/register';
+    ? `${API_BASE}/api/alumnos/register`
+    : `${API_BASE}/api/docentes/register`;
 
   const body = rolSeleccionado === 'alumno'
     ? { nombre, apellido, dni, password }
