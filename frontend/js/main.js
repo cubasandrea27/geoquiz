@@ -1,10 +1,4 @@
-/* ============================================================
-   GeoQuiz - Dashboard
-   Por ahora todo funciona con datos de ejemplo en memoria.
-   Cuando el backend tenga las rutas de temas/preguntas/
-   ubicaciones/respuestas, estos arrays se reemplazan por
-   fetch() a la API (como ya se hace en login y registro).
-============================================================ */
+
 
 const ICONOS = {
   pin: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11a7 7 0 0 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
@@ -26,6 +20,7 @@ const SECCIONES_DOCENTE = [
 ];
 
 const SECCIONES_ALUMNO = [
+  { id: 'materias-disponibles', label: 'Materias disponibles', icono: 'layers' },
   { id: 'preguntas-cercanas', label: 'Preguntas cercanas', icono: 'pin' },
   { id: 'mis-respuestas', label: 'Mis respuestas', icono: 'list' },
   { id: 'mis-temas', label: 'Mis temas', icono: 'compass' }
@@ -64,13 +59,37 @@ let formTemaAbierto = false;
 let formPreguntaAbierto = false;
 let formUbicacionAbierto = false;
 let filtroRespuestasTema = 'todos';
+let preguntaEnEdicion = null;
+let temaEnEdicion = null;
+
+// Temas reales del docente logueado, traídos de la API (reemplaza al
+// array de ejemplo "temas" en las secciones de docente: Preguntas y
+// Respuestas necesitan mostrar siempre los temas reales, no los de demo).
+let temasDocenteCache = [];
+
+async function cargarTemasDocenteCache() {
+  const docenteId = localStorage.getItem('userId');
+  if (!docenteId) {
+    temasDocenteCache = [];
+    return temasDocenteCache;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/temas/docente/${docenteId}`);
+    const data = await res.json();
+    temasDocenteCache = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error al cargar temas del docente:', error);
+    temasDocenteCache = [];
+  }
+  return temasDocenteCache;
+}
 
 function wp(n) {
   return 'WP-' + String(n).padStart(2, '0');
 }
 
 function nombreTema(id) {
-  const t = temas.find((x) => x.id === id);
+  const t = temasDocenteCache.find((x) => x.id === id) || temas.find((x) => x.id === id);
   return t ? t.nombre : '—';
 }
 
@@ -130,117 +149,359 @@ function mostrarSeccion(id) {
   });
 
   const render = RENDERS[id];
-  document.getElementById('contenido').innerHTML = render ? render() : '';
+  const resultado = render ? render() : '';
+
+  if (resultado instanceof Promise) {
+    resultado.then(html => {
+      document.getElementById('contenido').innerHTML = html;
+    });
+  } else {
+    document.getElementById('contenido').innerHTML = resultado;
+  }
 }
 
 /* ============================================================
    DOCENTE - Temas
 ============================================================ */
 
-function renderTemas() {
-  const filas = temas.map((t) => `
-    <div class="card-item">
-      <div class="card-icono acento">${ICONOS.layers}</div>
-      <div class="card-cuerpo">
-        <p class="card-wp">${wp(t.id)}</p>
-        <p class="card-titulo">${t.nombre}</p>
-        <p class="card-detalle">${t.descripcion}</p>
-      </div>
-      <span class="pill ${t.activo ? 'pill-activo' : 'pill-inactivo'}">${t.activo ? 'Activo' : 'Inactivo'}</span>
-    </div>
-  `).join('') || '<p class="vacio">Todavía no cargaste ningún tema.</p>';
+async function renderTemas() {
+  try {
+    await cargarTemasDocenteCache();
+    const temasAPI = temasDocenteCache;
 
-  return `
-    <div class="seccion-header">
-      <div>
-        <h2>Gestionar temas</h2>
-        <p class="seccion-sub">Los temas agrupan las preguntas que vas a repartir por el mapa.</p>
-      </div>
-      <button class="btn-accion" onclick="toggleFormTema()">${ICONOS.plus}Nuevo tema</button>
-    </div>
-    ${formTemaAbierto ? `
-      <div class="form-inline">
-        <div>
-          <label for="ft-nombre">Nombre</label>
-          <input id="ft-nombre" placeholder="Ej: Historia Argentina">
+    const filas = temasAPI.map((t) => `
+      <div class="card-item">
+        <div class="card-icono acento">${ICONOS.layers}</div>
+        <div class="card-cuerpo">
+          <p class="card-wp">${wp(t.id)}</p>
+          <p class="card-titulo">${t.nombre}</p>
+          <p class="card-detalle">${t.descripcion || 'Sin descripción'}</p>
         </div>
-        <div>
-          <label for="ft-desc">Descripción</label>
-          <input id="ft-desc" placeholder="Ej: Preguntas sobre historia nacional">
+        <span class="pill ${t.activo ? 'pill-activo' : 'pill-incorrecta'}">${t.activo ? 'Activo' : 'Inactivo'}</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-small" onclick="cambiarEstadoTema(${t.id})">${t.activo ? 'Desactivar' : 'Activar'}</button>
+          <button class="btn-small" onclick="editarTema(${t.id})">Editar</button>
+          <button class="btn-small btn-danger" onclick="eliminarTema(${t.id})">Eliminar</button>
         </div>
-        <button class="btn-primario" onclick="crearTema()">${ICONOS.check} Guardar tema</button>
       </div>
-    ` : ''}
-    <div class="grid-cards">${filas}</div>
-  `;
+    `).join('') || '<p class="vacio">Todavía no cargaste ningún tema.</p>';
+
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Gestionar temas</h2>
+          <p class="seccion-sub">Los temas agrupan las preguntas que vas a repartir por el mapa.</p>
+        </div>
+        <button class="btn-accion" onclick="toggleFormTema()">${ICONOS.plus}Nuevo tema</button>
+      </div>
+      ${formTemaAbierto ? `
+        <div class="form-inline">
+          ${temaEnEdicion ? `<p style="margin: 0 0 12px 0; font-size: 13px; color: var(--acento);">✏️ Editando tema #${temaEnEdicion.id}</p>` : ''}
+          <div>
+            <label for="ft-nombre">Nombre *</label>
+            <input id="ft-nombre" placeholder="Ej: Historia Argentina">
+          </div>
+          <div>
+            <label for="ft-desc">Descripción</label>
+            <input id="ft-desc" placeholder="Ej: Preguntas sobre historia nacional">
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-primario" onclick="crearTema()">${ICONOS.check} ${temaEnEdicion ? 'Guardar cambios' : 'Guardar tema'}</button>
+            <button class="btn-primario" style="background: var(--superficie-2); color: var(--texto);" onclick="temaEnEdicion ? cancelarEdicionTema() : toggleFormTema()">Cancelar</button>
+          </div>
+        </div>
+      ` : ''}
+      <div class="grid-cards">${filas}</div>
+    `;
+  } catch (error) {
+    console.error('Error al cargar temas:', error);
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Gestionar temas</h2>
+        </div>
+      </div>
+      <p class="vacio">Error al cargar los temas.</p>
+    `;
+  }
 }
 
 function toggleFormTema() {
   formTemaAbierto = !formTemaAbierto;
+  if (!formTemaAbierto) temaEnEdicion = null;
   mostrarSeccion('temas');
 }
 
-function crearTema() {
+async function crearTema() {
   const nombre = document.getElementById('ft-nombre').value.trim();
   const desc = document.getElementById('ft-desc').value.trim();
+  const docenteId = localStorage.getItem('userId');
+
   if (!nombre) {
     alert('Ingresá un nombre para el tema.');
     return;
   }
-  const nuevoId = temas.length ? Math.max(...temas.map((t) => t.id)) + 1 : 1;
-  temas.push({ id: nuevoId, nombre, descripcion: desc || 'Sin descripción', activo: true });
+
+  try {
+    if (temaEnEdicion) {
+      const res = await fetch(`${API_BASE}/api/temas/${temaEnEdicion.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, descripcion: desc })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'No se pudo actualizar el tema.');
+        return;
+      }
+
+      alert('Tema actualizado correctamente.');
+      temaEnEdicion = null;
+      formTemaAbierto = false;
+      mostrarSeccion('temas');
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/api/temas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre,
+        descripcion: desc,
+        docenteId
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo crear el tema.');
+      return;
+    }
+
+    if (data.existente) {
+      alert('Este tema ya existe.');
+    } else {
+      alert('Tema creado correctamente.');
+    }
+
+    formTemaAbierto = false;
+    mostrarSeccion('temas');
+  } catch (error) {
+    console.error('Error al crear/editar tema:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+function editarTema(temaId) {
+  const tema = temasDocenteCache.find((t) => t.id === temaId);
+  if (!tema) {
+    alert('No se pudo cargar el tema.');
+    return;
+  }
+
+  temaEnEdicion = tema;
+  formTemaAbierto = true;
+  mostrarSeccion('temas');
+
+  setTimeout(() => {
+    document.getElementById('ft-nombre').value = tema.nombre;
+    document.getElementById('ft-desc').value = tema.descripcion || '';
+    document.querySelector('.form-inline').scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+}
+
+function cancelarEdicionTema() {
+  temaEnEdicion = null;
   formTemaAbierto = false;
   mostrarSeccion('temas');
 }
 
-/* ============================================================
-   DOCENTE - Preguntas
-============================================================ */
+async function eliminarTema(temaId) {
+  if (!confirm('¿Estás seguro de que querés eliminar este tema? También se ocultarán sus preguntas.')) return;
 
-function renderPreguntas() {
-  const filas = preguntas.map((p) => `
-    <div class="card-item">
-      <div class="card-icono acento">${ICONOS.question}</div>
-      <div class="card-cuerpo">
-        <p class="card-wp">${wp(p.id)} · ${nombreTema(p.temaId)}</p>
-        <p class="card-titulo">${p.enunciado}</p>
-        <p class="card-detalle">${p.opciones.length} opciones · ubicación: ${nombreUbicacion(p.ubicacionId)}</p>
-      </div>
-    </div>
-  `).join('') || '<p class="vacio">Todavía no cargaste ninguna pregunta.</p>';
+  try {
+    const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
+      method: 'DELETE'
+    });
 
-  const opcionesTemas = temas.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
-  const opcionesUbic = ubicaciones.map((u) => `<option value="${u.id}">${u.nombre}</option>`).join('');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'No se pudo eliminar el tema.');
+      return;
+    }
 
-  return `
-    <div class="seccion-header">
-      <div>
-        <h2>Gestionar preguntas</h2>
-        <p class="seccion-sub">Cada pregunta se ata a un tema y, opcionalmente, a una ubicación puntual.</p>
-      </div>
-      <button class="btn-accion" onclick="toggleFormPregunta()">${ICONOS.plus}Nueva pregunta</button>
-    </div>
-    ${formPreguntaAbierto ? `
-      <div class="form-inline">
-        <div>
-          <label for="fp-enunciado">Enunciado</label>
-          <input id="fp-enunciado" placeholder="Ej: ¿En qué año...?">
+    alert('Tema eliminado.');
+    mostrarSeccion('temas');
+  } catch (error) {
+    console.error('Error al eliminar tema:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function cambiarEstadoTema(temaId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/temas/${temaId}/estado`, { method: 'PATCH' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'No se pudo cambiar el estado del tema.');
+      return;
+    }
+
+    mostrarSeccion('temas');
+  } catch (error) {
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function renderPreguntas() {
+  try {
+    await cargarTemasDocenteCache();
+
+    const ubicacionesPorTema = await Promise.all(temasDocenteCache.map(async (tema) => {
+      const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${tema.id}`);
+      const ubicacionesTema = await res.json();
+      return Array.isArray(ubicacionesTema) ? ubicacionesTema : [];
+    }));
+    const ubicacionesDocente = ubicacionesPorTema.flat();
+
+    const res = await fetch(`${API_BASE}/api/preguntas/todas`);
+    let preguntasAPI = await res.json();
+
+    if (!Array.isArray(preguntasAPI)) {
+      preguntasAPI = [];
+    }
+
+    // Sólo mostrar preguntas de temas que le pertenecen al docente logueado.
+    const idsTemasDocente = temasDocenteCache.map((t) => t.id);
+    preguntasAPI = preguntasAPI.filter((p) => idsTemasDocente.includes(p.temaId));
+
+    // Obtener tema seleccionado del filtro si existe
+    const filtroTemaSelect = document.getElementById('filtro-tema-preguntas');
+    const temaFiltro = filtroTemaSelect ? filtroTemaSelect.value : '';
+    
+    // Filtrar preguntas por tema si hay selección
+    const preguntasFiltradas = temaFiltro 
+      ? preguntasAPI.filter(p => String(p.temaId) === String(temaFiltro))
+      : preguntasAPI;
+
+    const filas = preguntasFiltradas.map((p) => `
+      <div class="card-item" style="flex-direction: column; align-items: stretch;">
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <div class="card-icono acento">${ICONOS.question}</div>
+          <div class="card-cuerpo">
+            <p style="font-size: 11px; color: var(--texto-tenue); margin: 0 0 6px 0;">Tema: ${p.temaNombre || 'Sin tema'}</p>
+            <p class="card-titulo">${p.enunciado}</p>
+            <div style="margin-top: 10px; font-size: 12px; color: var(--texto-tenue);">
+              <p>${p.opcion1 ? '✓ ' + p.opcion1 : ''}</p>
+              <p>${p.opcion2 ? '✓ ' + p.opcion2 : ''}</p>
+              <p>${p.opcion3 ? '✓ ' + p.opcion3 : ''}</p>
+              <p style="color: var(--exito); margin-top: 6px;">Correcta: Opción ${p.correcta}</p>
+            </div>
+          </div>
         </div>
-        <div class="form-fila">
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button class="btn-small" onclick="editarPregunta(${p.id})">Editar</button>
+          <button class="btn-small btn-danger" onclick="eliminarPregunta(${p.id})">Eliminar</button>
+        </div>
+      </div>
+    `).join('') || '<p class="vacio">Todavía no hay preguntas' + (temaFiltro ? ' para este tema.' : '.') + '</p>';
+
+    const opcionesTemas = temasDocenteCache.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('')
+      || '<option value="" disabled>Todavía no creaste ningún tema</option>';
+    const opcionesUbicaciones = ubicacionesDocente.map((ubicacion) => {
+      const tema = temasDocenteCache.find((item) => item.id === ubicacion.tema_id);
+      return `<option value="${ubicacion.id}" data-tema="${ubicacion.tema_id}">${tema ? tema.nombre + ' - ' : ''}${ubicacion.nombre || 'Ubicación ' + ubicacion.id}</option>`;
+    }).join('') || '<option value="" disabled>No hay ubicaciones cargadas</option>';
+
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Gestionar preguntas</h2>
+          <p class="seccion-sub">Cada pregunta tiene 3 opciones de respuesta. Marcá cuál es la correcta.</p>
+        </div>
+        <button class="btn-accion" onclick="toggleFormPregunta()">${ICONOS.plus}Nueva pregunta</button>
+      </div>
+      
+      <div class="form-inline" style="margin-bottom: 16px;">
+        <div>
+          <label for="filtro-tema-preguntas">Filtrar por tema</label>
+          <select id="filtro-tema-preguntas" onchange="mostrarSeccion('preguntas')">
+            <option value="">Todos los temas</option>
+            ${opcionesTemas}
+          </select>
+        </div>
+      </div>
+
+      ${formPreguntaAbierto ? `
+        <div class="form-inline">
+          ${preguntaEnEdicion ? `<p style="margin: 0 0 12px 0; font-size: 13px; color: var(--acento);">✏️ Editando pregunta #${preguntaEnEdicion.id}</p>` : ''}
           <div>
-            <label for="fp-tema">Tema</label>
+            <label for="fp-tema">Tema *</label>
             <select id="fp-tema">${opcionesTemas}</select>
           </div>
           <div>
-            <label for="fp-ubic">Ubicación</label>
-            <select id="fp-ubic">${opcionesUbic}</select>
+            <label for="fp-ubicacion">Ubicación *</label>
+            <select id="fp-ubicacion">${opcionesUbicaciones}</select>
+          </div>
+          <div>
+            <label for="fp-enunciado">Enunciado de la pregunta *</label>
+            <textarea id="fp-enunciado" placeholder="Ej: ¿En qué año se declaró la Independencia Argentina?" style="height: 60px;"></textarea>
+          </div>
+          <fieldset style="border: 1px solid var(--borde); border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+            <legend style="padding: 0 8px;">Opciones de respuesta</legend>
+            <div style="display: grid; gap: 10px;">
+              <div>
+                <label for="fp-opcion1">Opción 1 *</label>
+                <input id="fp-opcion1" placeholder="Primera opción" />
+              </div>
+              <div>
+                <label for="fp-opcion2">Opción 2 *</label>
+                <input id="fp-opcion2" placeholder="Segunda opción" />
+              </div>
+              <div>
+                <label for="fp-opcion3">Opción 3 *</label>
+                <input id="fp-opcion3" placeholder="Tercera opción" />
+              </div>
+              <div style="padding: 10px; background: var(--superficie-2); border-radius: 6px;">
+                <label style="font-size: 12px;">¿Cuál es la respuesta correcta? *</label>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="fp-correcta" value="1" checked />
+                    <span style="font-size: 12px;">Opción 1</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="fp-correcta" value="2" />
+                    <span style="font-size: 12px;">Opción 2</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="fp-correcta" value="3" />
+                    <span style="font-size: 12px;">Opción 3</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-primario" onclick="crearPregunta()">${ICONOS.check} ${preguntaEnEdicion ? 'Guardar cambios' : 'Guardar pregunta'}</button>
+            <button class="btn-primario" style="background: var(--superficie-2); color: var(--texto);" onclick="preguntaEnEdicion ? cancelarEdicion() : toggleFormPregunta()">Cancelar</button>
           </div>
         </div>
-        <button class="btn-primario" onclick="crearPregunta()">${ICONOS.check} Guardar pregunta</button>
+      ` : ''}
+      <div class="grid-cards">${filas}</div>
+    `;
+  } catch (error) {
+    console.error('Error al cargar preguntas:', error);
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Gestionar preguntas</h2>
+        </div>
       </div>
-    ` : ''}
-    <div class="grid-cards">${filas}</div>
-  `;
+      <p class="vacio">Error al cargar las preguntas.</p>
+    `;
+  }
 }
 
 function toggleFormPregunta() {
@@ -248,37 +509,195 @@ function toggleFormPregunta() {
   mostrarSeccion('preguntas');
 }
 
-function crearPregunta() {
-  const enunciado = document.getElementById('fp-enunciado').value.trim();
-  const temaId = Number(document.getElementById('fp-tema').value);
-  const ubicacionId = Number(document.getElementById('fp-ubic').value);
-  if (!enunciado || !temaId) {
-    alert('Completá el enunciado y elegí un tema.');
+async function crearPregunta() {
+  // Si estamos editando, llamar a guardarEdicionPregunta
+  if (preguntaEnEdicion) {
+    guardarEdicionPregunta();
     return;
   }
-  const nuevoId = preguntas.length ? Math.max(...preguntas.map((p) => p.id)) + 1 : 1;
-  preguntas.push({ id: nuevoId, temaId, ubicacionId, enunciado, opciones: ['Opción 1', 'Opción 2'], correcta: 0 });
+
+  const temaId = Number(document.getElementById('fp-tema').value);
+  const ubicacionId = Number(document.getElementById('fp-ubicacion').value);
+  const enunciado = document.getElementById('fp-enunciado').value.trim();
+  const opcion1 = document.getElementById('fp-opcion1').value.trim();
+  const opcion2 = document.getElementById('fp-opcion2').value.trim();
+  const opcion3 = document.getElementById('fp-opcion3').value.trim();
+  const respuestaCorrecta = document.querySelector('input[name="fp-correcta"]:checked').value;
+
+  if (!temaId || !ubicacionId || !enunciado || !opcion1 || !opcion2 || !opcion3) {
+    alert('Completá tema, ubicación, enunciado y las 3 opciones.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/preguntas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        temaId,
+        ubicacionId,
+        enunciado,
+        opciones: [opcion1, opcion2, opcion3],
+        respuestaCorrecta
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo guardar la pregunta.');
+      return;
+    }
+
+    alert('Pregunta guardada correctamente.');
+    formPreguntaAbierto = false;
+    mostrarSeccion('preguntas');
+  } catch (error) {
+    console.error('Error al crear pregunta:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function editarPregunta(preguntaId) {
+  // Obtener datos de la pregunta
+  const res = await fetch(`${API_BASE}/api/preguntas/todas`);
+  const preguntasAPI = await res.json();
+  const pregunta = preguntasAPI.find(p => p.id === preguntaId);
+
+  if (!pregunta) {
+    alert('No se pudo cargar la pregunta.');
+    return;
+  }
+
+  // Cargar datos en el formulario
+  preguntaEnEdicion = pregunta;
+  
+  // Abrir formulario
+  formPreguntaAbierto = true;
+  
+  // Mostrar sección y luego rellenar campos
+  mostrarSeccion('preguntas');
+  
+  // Esperar a que el DOM se renderice
+  setTimeout(() => {
+    document.getElementById('fp-tema').value = pregunta.temaId;
+    document.getElementById('fp-enunciado').value = pregunta.enunciado;
+    document.getElementById('fp-opcion1').value = pregunta.opcion1;
+    document.getElementById('fp-opcion2').value = pregunta.opcion2;
+    document.getElementById('fp-opcion3').value = pregunta.opcion3;
+    
+    // Marcar respuesta correcta
+    document.querySelector(`input[name="fp-correcta"][value="${pregunta.correcta}"]`).checked = true;
+    
+    // Scroll al formulario
+    document.querySelector('.form-inline').scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+}
+
+async function guardarEdicionPregunta() {
+  const enunciado = document.getElementById('fp-enunciado').value.trim();
+  const opcion1 = document.getElementById('fp-opcion1').value.trim();
+  const opcion2 = document.getElementById('fp-opcion2').value.trim();
+  const opcion3 = document.getElementById('fp-opcion3').value.trim();
+
+  if (!enunciado || !opcion1 || !opcion2 || !opcion3) {
+    alert('Completá el enunciado y todas las 3 opciones.');
+    return;
+  }
+
+  try {
+    // Actualizar enunciado
+    const resEnunciado = await fetch(`${API_BASE}/api/preguntas/${preguntaEnEdicion.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enunciado })
+    });
+
+    if (!resEnunciado.ok) {
+      alert('No se pudo actualizar el enunciado.');
+      return;
+    }
+
+    // Actualizar opciones
+    for (let i = 0; i < 3; i++) {
+      const opcion = [opcion1, opcion2, opcion3][i];
+      const esCorrecta = String(i + 1) === document.querySelector('input[name="fp-correcta"]:checked').value;
+      const opcionId = preguntaEnEdicion.opciones[i]?.id;
+
+      if (opcionId) {
+        const resOpcion = await fetch(`${API_BASE}/api/preguntas/${preguntaEnEdicion.id}/opciones/${opcionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texto: opcion, esCorrecta })
+        });
+
+        if (!resOpcion.ok) {
+          alert('No se pudieron actualizar todas las opciones.');
+          return;
+        }
+      }
+    }
+
+    alert('Pregunta actualizada correctamente.');
+    preguntaEnEdicion = null;
+    formPreguntaAbierto = false;
+    mostrarSeccion('preguntas');
+  } catch (error) {
+    console.error('Error al guardar edición:', error);
+    alert('Error al conectar con el servidor.');
+  }
+}
+
+async function cancelarEdicion() {
+  preguntaEnEdicion = null;
   formPreguntaAbierto = false;
   mostrarSeccion('preguntas');
+}
+
+async function eliminarPregunta(preguntaId) {
+  if (!confirm('¿Estás seguro de que querés eliminar esta pregunta?')) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) {
+      alert('No se pudo eliminar la pregunta.');
+      return;
+    }
+
+    alert('Pregunta eliminada.');
+    mostrarSeccion('preguntas');
+  } catch (error) {
+    console.error('Error al eliminar pregunta:', error);
+    alert('Error al conectar con el servidor.');
+  }
 }
 
 /* ============================================================
    DOCENTE - Ubicaciones
 ============================================================ */
 
-function renderUbicaciones() {
-  const filas = ubicaciones.map((u) => `
+async function renderUbicaciones() {
+  await cargarTemasDocenteCache();
+  const ubicacionesDocente = (await Promise.all(temasDocenteCache.map(async (tema) => {
+    const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${tema.id}`);
+    const datos = await res.json();
+    return Array.isArray(datos) ? datos : [];
+  }))).flat();
+
+  const filas = ubicacionesDocente.map((u) => `
     <div class="card-item">
       <div class="card-icono acento">${ICONOS.map}</div>
       <div class="card-cuerpo">
-        <p class="card-wp">${wp(u.id)} · ${nombreTema(u.temaId)}</p>
-        <p class="card-titulo">${u.nombre}</p>
-        <p class="card-coord">${u.lat.toFixed(4)}, ${u.lng.toFixed(4)} · radio ${u.radio} m</p>
+        <p class="card-wp">${wp(u.id)} · ${nombreTema(u.tema_id)}</p>
+        <p class="card-titulo">${u.nombre || 'Sin nombre'}</p>
+        <p class="card-coord">${Number(u.latitud).toFixed(4)}, ${Number(u.longitud).toFixed(4)} · radio ${u.radio_metros} m</p>
       </div>
     </div>
   `).join('') || '<p class="vacio">Todavía no cargaste ninguna ubicación.</p>';
 
-  const opcionesTemas = temas.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  const opcionesTemas = temasDocenteCache.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
 
   return `
     <div class="seccion-header">
@@ -326,7 +745,7 @@ function toggleFormUbicacion() {
   mostrarSeccion('ubicaciones');
 }
 
-function crearUbicacion() {
+async function crearUbicacion() {
   const nombre = document.getElementById('fu-nombre').value.trim();
   const lat = parseFloat(document.getElementById('fu-lat').value);
   const lng = parseFloat(document.getElementById('fu-lng').value);
@@ -336,63 +755,127 @@ function crearUbicacion() {
     alert('Completá nombre, latitud, longitud y tema.');
     return;
   }
-  const nuevoId = ubicaciones.length ? Math.max(...ubicaciones.map((u) => u.id)) + 1 : 1;
-  ubicaciones.push({ id: nuevoId, temaId, nombre, lat, lng, radio: isNaN(radio) ? 50 : radio });
-  formUbicacionAbierto = false;
-  mostrarSeccion('ubicaciones');
+  try {
+    const res = await fetch(`${API_BASE}/api/ubicaciones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        temaId,
+        nombre,
+        latitud: lat,
+        longitud: lng,
+        radio_metros: isNaN(radio) ? 50 : radio
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo guardar la ubicación.');
+      return;
+    }
+
+    alert('Ubicación guardada correctamente.');
+    formUbicacionAbierto = false;
+    mostrarSeccion('ubicaciones');
+  } catch (error) {
+    alert('Error al conectar con el servidor.');
+  }
 }
 
 /* ============================================================
    DOCENTE - Ver respuestas
 ============================================================ */
 
-function renderRespuestas() {
-  const listaFiltrada = filtroRespuestasTema === 'todos'
-    ? respuestas
-    : respuestas.filter((r) => {
-        const p = preguntas.find((x) => x.id === r.preguntaId);
-        return p && p.temaId === Number(filtroRespuestasTema);
-      });
+async function renderRespuestas() {
+  try {
+    await cargarTemasDocenteCache();
+    const docenteId = localStorage.getItem('userId');
 
-  const filas = listaFiltrada.map((r) => {
-    const p = preguntas.find((x) => x.id === r.preguntaId);
+    const res = await fetch(`${API_BASE}/api/respuestas/docente/${docenteId}`);
+    const respuestasAPI = await res.json();
+
+    if (!Array.isArray(respuestasAPI)) {
+      return `
+        <div class="seccion-header">
+          <div>
+            <h2>Ver respuestas</h2>
+          </div>
+        </div>
+        <p class="vacio">Error al cargar las respuestas.</p>
+      `;
+    }
+
+    // Filtrar del lado del cliente por el tema elegido, y recalcular el
+    // puntaje de cada alumno en base a las respuestas visibles.
+    const alumnosFiltrados = respuestasAPI
+      .map((alumno) => {
+        const respuestasFiltradas = filtroRespuestasTema === 'todos'
+          ? alumno.respuestas
+          : alumno.respuestas.filter((r) => String(r.tema_id) === String(filtroRespuestasTema));
+
+        const puntaje = respuestasFiltradas.filter((r) => r.resultado === 'correcta').length;
+
+        return { ...alumno, respuestas: respuestasFiltradas, puntaje };
+      })
+      .filter((alumno) => alumno.respuestas.length > 0);
+
+    const filas = alumnosFiltrados.map((alumno) => `
+      <div class="card-item" style="flex-direction: column; align-items: stretch;">
+        <div>
+          <p class="card-titulo">${alumno.nombre} ${alumno.apellido}</p>
+          <p class="card-detalle">Puntaje: ${alumno.puntaje} de ${alumno.respuestas.length}</p>
+        </div>
+        <div style="border-top: 1px solid var(--borde); padding-top: 12px; margin-top: 12px;">
+          ${alumno.respuestas.map((resp, idx) => `
+            <div style="margin-bottom: 12px; padding-bottom: 12px; ${idx < alumno.respuestas.length - 1 ? 'border-bottom: 1px dashed var(--borde);' : ''}">
+              <p style="font-size: 12px; color: var(--texto-tenue); margin: 0 0 4px 0;">${resp.tema_nombre || 'Sin tema'}</p>
+              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">${resp.pregunta}</p>
+              <p style="margin: 0; font-size: 12px;">
+                <strong>Respuesta:</strong> ${resp.opcion_elegida}
+              </p>
+              <p style="margin: 4px 0 0 0; font-size: 12px;">
+                <strong>Resultado:</strong> 
+                <span class="pill ${resp.resultado === 'correcta' ? 'pill-correcta' : 'pill-incorrecta'}" style="font-size: 10px;">
+                  ${resp.resultado === 'correcta' ? '✓ Correcta' : '✗ Incorrecta'}
+                </span>
+              </p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('') || '<p class="vacio">Todavía no hay alumnos que hayan respondido' + (filtroRespuestasTema !== 'todos' ? ' para este tema.' : '.') + '</p>';
+
+    const opcionesTemas = temasDocenteCache.map((t) => `<option value="${t.id}" ${filtroRespuestasTema === String(t.id) ? 'selected' : ''}>${t.nombre}</option>`).join('');
+
     return `
-      <tr>
-        <td>${r.alumno}</td>
-        <td>${p ? p.enunciado : '—'}</td>
-        <td><span class="pill ${r.correcta ? 'pill-correcta' : 'pill-incorrecta'}">${r.correcta ? 'Correcta' : 'Incorrecta'}</span></td>
-        <td class="card-coord">${r.fecha}</td>
-      </tr>
+      <div class="seccion-header">
+        <div>
+          <h2>Ver respuestas</h2>
+          <p class="seccion-sub">Detalle de qué respondió cada alumno.</p>
+        </div>
+      </div>
+      <div class="form-inline filtro-tabla">
+        <div>
+          <label for="filtro-tema">Filtrar por tema</label>
+          <select id="filtro-tema" onchange="filtrarRespuestas(this.value)">
+            <option value="todos" ${filtroRespuestasTema === 'todos' ? 'selected' : ''}>Todos los temas</option>
+            ${opcionesTemas}
+          </select>
+        </div>
+      </div>
+      <div class="grid-cards">${filas}</div>
     `;
-  }).join('');
-
-  const opcionesTemas = temas.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
-
-  return `
-    <div class="seccion-header">
-      <div>
-        <h2>Ver respuestas</h2>
-        <p class="seccion-sub">Historial de respuestas de los alumnos inscriptos.</p>
+  } catch (error) {
+    console.error('Error al cargar respuestas:', error);
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Ver respuestas</h2>
+        </div>
       </div>
-    </div>
-    <div class="form-inline filtro-tabla">
-      <div>
-        <label for="filtro-tema">Filtrar por tema</label>
-        <select id="filtro-tema" onchange="filtrarRespuestas(this.value)">
-          <option value="todos" ${filtroRespuestasTema === 'todos' ? 'selected' : ''}>Todos los temas</option>
-          ${opcionesTemas}
-        </select>
-      </div>
-    </div>
-    ${filas ? `
-      <table class="tabla-resp">
-        <thead>
-          <tr><th>Alumno</th><th>Pregunta</th><th>Resultado</th><th>Fecha</th></tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-    ` : '<p class="vacio">No hay respuestas para ese tema todavía.</p>'}
-  `;
+      <p class="vacio">Error al cargar las respuestas.</p>
+    `;
+  }
 }
 
 function filtrarRespuestas(valor) {
@@ -400,64 +883,103 @@ function filtrarRespuestas(valor) {
   mostrarSeccion('respuestas');
 }
 
-/* ============================================================
-   ALUMNO - Preguntas cercanas
-============================================================ */
 
-function renderPreguntasCercanas() {
-  const yaRespondidas = misRespuestas.map((r) => r.preguntaId);
-  const disponibles = preguntas.filter((p) => !yaRespondidas.includes(p.id));
+function obtenerUbicacionActual() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('El navegador no permite obtener la ubicación.'));
+      return;
+    }
 
-  if (!disponibles.length) {
-    return `
-      <div class="seccion-header">
-        <div>
-          <h2>Preguntas cercanas</h2>
-          <p class="seccion-sub">Estas son las preguntas de los puntos donde estás parado ahora.</p>
-        </div>
-      </div>
-      <p class="vacio">Ya respondiste todas las preguntas cercanas por ahora. Volvé a pasar por acá más tarde.</p>
-    `;
-  }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
+      () => reject(new Error('Necesitamos tu ubicación para mostrar preguntas cercanas.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
 
-  const tarjetas = disponibles.map((p) => `
-    <div class="pregunta-card" id="pregunta-${p.id}">
-      <p class="card-wp">${wp(p.id)} · ${nombreUbicacion(p.ubicacionId)} · dentro del radio</p>
-      <p class="pregunta-enunciado">${p.enunciado}</p>
-      ${p.opciones.map((op, i) => `
-        <button class="opcion" onclick="responderPregunta(${p.id}, ${i})">${op}</button>
-      `).join('')}
-    </div>
-  `).join('');
-
-  return `
+async function renderPreguntasCercanas() {
+  const alumnoId = localStorage.getItem('userId');
+  const encabezado = `
     <div class="seccion-header">
       <div>
         <h2>Preguntas cercanas</h2>
         <p class="seccion-sub">Estas son las preguntas de los puntos donde estás parado ahora.</p>
       </div>
     </div>
-    ${tarjetas}
   `;
+
+  if (!alumnoId) return `${encabezado}<p class="vacio">No se pudo identificar al alumno.</p>`;
+
+  try {
+    const [ubicacion, temasRes] = await Promise.all([
+      obtenerUbicacionActual(),
+      fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`)
+    ]);
+    const temasInscritos = await temasRes.json();
+
+    const preguntasPorTema = await Promise.all(temasInscritos.map(async (tema) => {
+      const params = new URLSearchParams({
+        temaId: tema.id,
+        alumnoId,
+        lat: ubicacion.lat,
+        lng: ubicacion.lng
+      });
+      const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
+      if (!res.ok) throw new Error('No se pudieron cargar las preguntas.');
+      const preguntasTema = await res.json();
+      return preguntasTema.map((pregunta) => ({ ...pregunta, temaNombre: tema.nombre }));
+    }));
+
+    const disponibles = preguntasPorTema.flat();
+    if (!disponibles.length) {
+      return `${encabezado}<p class="vacio">No hay preguntas disponibles en tu ubicación. Volvé a intentar más tarde.</p>`;
+    }
+
+    const tarjetas = disponibles.map((p) => `
+      <div class="pregunta-card" id="pregunta-${p.id}">
+        <p class="card-wp">${wp(p.id)} · ${p.temaNombre} · dentro del radio</p>
+        <p class="pregunta-enunciado">${p.enunciado}</p>
+        ${p.opciones.map((opcion) => `
+          <button class="opcion" onclick="responderPregunta(${p.id}, ${opcion.id})">${opcion.texto}</button>
+        `).join('')}
+      </div>
+    `).join('');
+
+    return `${encabezado}${tarjetas}`;
+  } catch (error) {
+    return `${encabezado}<p class="vacio">${error.message}</p>`;
+  }
 }
 
-function responderPregunta(preguntaId, opcionIndex) {
-  const p = preguntas.find((x) => x.id === preguntaId);
-  if (!p) return;
-
-  const esCorrecta = opcionIndex === p.correcta;
+async function responderPregunta(preguntaId, opcionId) {
+  const alumnoId = localStorage.getItem('userId');
   const botones = document.querySelectorAll(`#pregunta-${preguntaId} .opcion`);
-  botones.forEach((btn, i) => {
-    btn.disabled = true;
-    if (i === opcionIndex) btn.classList.add(esCorrecta ? 'correcta' : 'incorrecta');
-    if (i === p.correcta && !esCorrecta) btn.classList.add('correcta');
-  });
+  botones.forEach((btn) => { btn.disabled = true; });
 
-  const ahora = new Date();
-  const fecha = `${String(ahora.getDate()).padStart(2, '0')}/${String(ahora.getMonth() + 1).padStart(2, '0')} ${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-  misRespuestas.push({ preguntaId, correcta: esCorrecta, fecha });
+  try {
+    const ubicacion = await obtenerUbicacionActual();
+    const res = await fetch(`${API_BASE}/api/respuestas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        alumnoId,
+        preguntaId,
+        opcionId,
+        latitud: ubicacion.lat,
+        longitud: ubicacion.lng
+      })
+    });
 
-  setTimeout(() => mostrarSeccion('preguntas-cercanas'), 900);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo registrar la respuesta.');
+    alert(data.esCorrecta ? 'Respuesta correcta.' : 'Respuesta incorrecta.');
+    mostrarSeccion('preguntas-cercanas');
+  } catch (error) {
+    botones.forEach((btn) => { btn.disabled = false; });
+    alert(error.message);
+  }
 }
 
 /* ============================================================
@@ -494,36 +1016,198 @@ function renderMisRespuestas() {
    ALUMNO - Mis temas
 ============================================================ */
 
-function renderMisTemas() {
-  const filas = temas.map((t) => {
-    const totalPreguntas = preguntas.filter((p) => p.temaId === t.id).length;
-    const respondidas = preguntas.filter((p) => p.temaId === t.id && misRespuestas.some((r) => r.preguntaId === p.id)).length;
-    const porcentaje = totalPreguntas ? Math.round((respondidas / totalPreguntas) * 100) : 0;
+async function renderMisTemas() {
+  const userId = localStorage.getItem('userId');
 
+  if (!userId) {
     return `
-      <div class="card-item" style="flex-direction: column; align-items: stretch;">
-        <div style="display:flex; align-items:flex-start; gap:12px;">
-          <div class="card-icono acento">${ICONOS.compass}</div>
-          <div class="card-cuerpo">
-            <p class="card-wp">${wp(t.id)}</p>
-            <p class="card-titulo">${t.nombre}</p>
-            <p class="card-detalle">${respondidas} de ${totalPreguntas} preguntas respondidas</p>
+      <div class="seccion-header">
+        <div>
+          <h2>Mis temas</h2>
+          <p class="seccion-sub">Progreso dentro de cada tema en el que estás inscripto.</p>
+        </div>
+      </div>
+      <p class="vacio">No se pudo cargar tu información.</p>
+    `;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
+    const temasInscritos = await res.json();
+
+    if (!temasInscritos.length) {
+      return `
+        <div class="seccion-header">
+          <div>
+            <h2>Mis temas</h2>
+            <p class="seccion-sub">Progreso dentro de cada tema en el que estás inscripto.</p>
           </div>
         </div>
-        <div class="progreso"><div class="progreso-barra" style="width:${porcentaje}%;"></div></div>
-      </div>
-    `;
-  }).join('') || '<p class="vacio">Todavía no estás inscripto en ningún tema.</p>';
+        <p class="vacio">Todavía no estás inscripto en ningún tema. Ve a "Materias disponibles" para inscribirte.</p>
+      `;
+    }
 
-  return `
-    <div class="seccion-header">
-      <div>
-        <h2>Mis temas</h2>
-        <p class="seccion-sub">Progreso dentro de cada tema en el que estás inscripto.</p>
+    const filas = temasInscritos.map((t) => {
+      // Por ahora, sin preguntas respondidas (se puede mejorar después)
+      const totalPreguntas = 0;
+      const respondidas = 0;
+      const porcentaje = 0;
+
+      return `
+        <div class="card-item" style="flex-direction: column; align-items: stretch;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <div class="card-icono acento">${ICONOS.compass}</div>
+            <div class="card-cuerpo">
+              <p class="card-titulo">${t.nombre}</p>
+              <p class="card-detalle">${t.descripcion || 'Sin descripción'}</p>
+            </div>
+          </div>
+          <button class="btn-secundario" onclick="mostrarSeccion('preguntas-cercanas')" style="margin-top: 12px;">
+            Ver preguntas
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Mis temas</h2>
+          <p class="seccion-sub">Temas en los que estás inscripto.</p>
+        </div>
       </div>
-    </div>
-    <div class="grid-cards">${filas}</div>
-  `;
+      <div class="grid-cards">${filas}</div>
+    `;
+  } catch (err) {
+    console.error('Error al cargar mis temas:', err);
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Mis temas</h2>
+        </div>
+      </div>
+      <p class="vacio">Error al cargar tus temas.</p>
+    `;
+  }
+}
+
+/* ============================================================
+   ALUMNO - Materias disponibles (por carrera)
+============================================================ */
+
+async function renderMateriasDisponibles() {
+  const carreraId = localStorage.getItem('carreraId');
+  const userId = localStorage.getItem('userId');
+
+  if (!carreraId) {
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Materias disponibles</h2>
+          <p class="seccion-sub">No tienes asignada una carrera aún.</p>
+        </div>
+      </div>
+      <p class="vacio">Contactá con administración para que te asignen una carrera.</p>
+    `;
+  }
+
+  try {
+    // Obtener temas disponibles para la carrera
+    const resCarrera = await fetch(`${API_BASE}/api/carreras/${carreraId}/temas`);
+    const temasCarrera = await resCarrera.json();
+
+    // Obtener temas en los que ya estoy inscrito
+    const resInscripciones = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
+    const temasInscritos = await resInscripciones.json();
+    const idsTemasInscritos = temasInscritos.map(t => t.id);
+
+    if (!temasCarrera.length) {
+      return `
+        <div class="seccion-header">
+          <div>
+            <h2>Materias disponibles</h2>
+            <p class="seccion-sub">Materias de tu carrera disponibles para inscribirse.</p>
+          </div>
+        </div>
+        <p class="vacio">No hay materias disponibles para tu carrera aún.</p>
+      `;
+    }
+
+    const filas = temasCarrera.map((t) => {
+      const yaInscrito = idsTemasInscritos.includes(t.id);
+      const btnClass = yaInscrito ? 'btn-inscrito' : 'btn-inscribirse';
+      const btnTexto = yaInscrito ? 'Inscripto ✓' : 'Inscribirse';
+      const btnDisabled = yaInscrito ? 'disabled' : '';
+
+      return `
+        <div class="card-item" style="flex-direction: column; align-items: stretch;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <div class="card-icono acento">${ICONOS.layers}</div>
+            <div class="card-cuerpo">
+              <p class="card-titulo">${t.nombre}</p>
+              <p class="card-detalle">${t.descripcion || 'Sin descripción'}</p>
+            </div>
+          </div>
+          <button class="${btnClass}" onclick="inscribirseAlTema(${t.id})" ${btnDisabled} style="margin-top: 12px;">
+            ${btnTexto}
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Materias disponibles</h2>
+          <p class="seccion-sub">Materias de tu carrera disponibles para inscribirse.</p>
+        </div>
+      </div>
+      <div class="grid-cards">${filas}</div>
+    `;
+  } catch (err) {
+    console.error('Error al cargar materias disponibles:', err);
+    return `
+      <div class="seccion-header">
+        <div>
+          <h2>Materias disponibles</h2>
+        </div>
+      </div>
+      <p class="vacio">Error al cargar las materias disponibles.</p>
+    `;
+  }
+}
+
+/* ============================================================
+   ALUMNO - Funciones de inscripción
+============================================================ */
+
+async function inscribirseAlTema(temaId) {
+  const userId = localStorage.getItem('userId');
+
+  if (!userId) {
+    alert('No se pudo identificar tu usuario.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/tema-alumno`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alumnoId: userId, temaId })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'No se pudo realizar la inscripción.');
+      return;
+    }
+
+    alert('¡Te has inscripto correctamente!');
+    mostrarSeccion('materias-disponibles');
+  } catch (err) {
+    console.error('Error al inscribirse:', err);
+    alert('Error al conectar con el servidor.');
+  }
 }
 
 /* ---------------- Router de secciones ---------------- */
@@ -535,5 +1219,6 @@ const RENDERS = {
   'respuestas': renderRespuestas,
   'preguntas-cercanas': renderPreguntasCercanas,
   'mis-respuestas': renderMisRespuestas,
-  'mis-temas': renderMisTemas
+  'mis-temas': renderMisTemas,
+  'materias-disponibles': renderMateriasDisponibles
 };
