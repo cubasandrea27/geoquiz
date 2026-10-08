@@ -167,6 +167,51 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { temaId, ubicacionId, enunciado, opciones, respuestaCorrecta } = req.body;
+
+  if (!temaId || !ubicacionId || !enunciado || !Array.isArray(opciones) || opciones.length !== 3 || !respuestaCorrecta) {
+    return res.status(400).json({ error: 'Faltan datos para actualizar la pregunta' });
+  }
+
+  try {
+    const [pregunta] = await pool.query(
+      'SELECT id FROM preguntas WHERE id = ? AND tema_id = ? AND activo = 1',
+      [id, temaId]
+    );
+
+    if (!pregunta.length) {
+      return res.status(404).json({ error: 'Pregunta no encontrada' });
+    }
+
+    const [ubicacion] = await pool.query(
+      'SELECT id FROM ubicaciones WHERE id = ? AND tema_id = ? AND activo = 1',
+      [ubicacionId, temaId]
+    );
+
+    if (!ubicacion.length) {
+      return res.status(400).json({ error: 'La ubicación no pertenece al tema' });
+    }
+
+    await pool.query('UPDATE preguntas SET ubicacion_id = ?, enunciado = ? WHERE id = ?', [ubicacionId, enunciado, id]);
+    const [opcionesActuales] = await pool.query('SELECT id FROM opciones WHERE pregunta_id = ?', [id]);
+
+    for (const [index, opcion] of opcionesActuales.entries()) {
+      await pool.query('UPDATE opciones SET texto = ?, es_correcta = ? WHERE id = ?', [
+        opciones[index].trim(),
+        index + 1 === Number(respuestaCorrecta) ? 1 : 0,
+        opcion.id
+      ]);
+    }
+
+    res.json({ message: 'Pregunta actualizada' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'No se pudo actualizar la pregunta' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 

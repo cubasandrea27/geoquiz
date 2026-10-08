@@ -1,0 +1,12 @@
+{
+  "name": "GeoQuiz",
+  "short_name": "GeoQuiz",
+  "description": "Quiz geolocalizado para aulas y clases",
+  "start_url": "pages/mobile.html",
+  "display": "standalone",
+  "background_color": "#12232e",
+  "theme_color": "#12232e",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

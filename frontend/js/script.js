@@ -105,7 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('userId', data.id || '');
       localStorage.setItem('docenteId', data.id || '');
       localStorage.setItem('isLoggedIn', 'true');
-      window.location.href = `${getBasePath()}dashboard.html`;
+      if (data.rol === 'docente') {
+        window.location.href = `${getBasePath()}dashboard.html`;
+      } else {
+        window.location.href = `${getBasePath()}dashboard.html`;
+      }
     } catch (error) {
       alert('No se pudo conectar con el servidor.');
     }

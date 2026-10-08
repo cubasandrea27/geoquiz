@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#12232e">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="stylesheet" href="../css/styles.css">
+  <title>GeoQuiz Móvil</title>
+</head>
+<body style="padding:16px; min-height:100vh;">
+  <main style="width:100%; max-width:520px; margin:0 auto;">
+    <header style="color:white; margin-bottom:20px;"><h1>GeoQuiz</h1><p id="usuario">Cargando...</p></header>
+    <section id="notificaciones" style="margin-bottom:18px;"></section>
+    <select id="temas" aria-label="Temas"><option>Cargando...</option></select>
+    <button class="ingresar" id="inscribirse">Inscribirme</button>
+    <section id="quiz" style="margin-top:20px; display:none;"></section>
+    <button class="ingresar" id="resultados" style="margin-top:16px;">Ver resultados</button>
+    <button class="ingresar" id="instalar" style="margin-top:10px; display:none;">Instalar GeoQuiz</button>
+    <button class="ingresar" id="cerrar" style="margin-top:10px; background:transparent; color:#ede6d6; border:1px solid #35505e;">Cerrar sesión</button>
+  </main>
+  <script src="../js/config.js"></script>
+  <script src="../js/notificaciones.js"></script>
+  <script>
+    let token = localStorage.getItem('token');
+    let alumnoId = localStorage.getItem('userId');
+    let temaId = null;
+    let pregunta = null;
+    let deferredInstallPrompt = null;
+
+    if (!token || localStorage.getItem('rol') !== 'alumno') window.location.href = 'index.html';
+    navigator.serviceWorker.register('../service-worker.js').catch(() => {});
+    document.getElementById('usuario').textContent = localStorage.getItem('name') || 'Alumno';
+    document.getElementById('cerrar').addEventListener('click', () => { localStorage.clear(); window.location.href = 'index.html'; });
+    document.getElementById('inscribirse').addEventListener('click', inscribirse);
+    document.getElementById('resultados').addEventListener('click', () => window.location.href = 'resultados.html');
+
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      document.getElementById('instalar').style.display = 'block';
+    });
+
+    document.getElementById('instalar').addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        document.getElementById('instalar').style.display = 'none';
+      }
+      deferredInstallPrompt = null;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('instalar').style.display = 'none';
+    });
+
+    cargarTemas(); cargarNotificaciones();
+
+    async function cargarTemas() {
+      const response = await fetch(`${API_BASE}/api/temas`);
+      const temas = await response.json();
+      const select = document.getElementById('temas');
+      select.innerHTML = '<option value="">Selecciona un tema</option>' + temas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+      select.onchange = () => { temaId = select.value; cargarQuiz(); };
+    }
+
+    async function cargarQuiz() {
+      if (!temaId || !alumnoId) return;
+      const lat = localStorage.getItem('gpsLat');
+      const lng = localStorage.getItem('gpsLng');
+      if (!lat || !lng) {
+        return mostrarNotificacion('La ubicación GPS es necesaria.', 'info');
+      }
+      const response = await fetch(`${API_BASE}/api/preguntas?temaId=${temaId}&alumnoId=${alumnoId}&lat=${lat}&lng=${lng}`);
+      const preguntas = await response.json();
+      if (!response.ok) return mostrarNotificacion(preguntas.error, 'error');
+      if (!preguntas.length) return mostrarNotificacion('No hay preguntas cercanas.', 'info');
+      pregunta = preguntas[0];
+      document.getElementById('quiz').style.display = 'block';
+      document.getElementById('quiz').innerHTML = `<h2>${pregunta.enunciado}</h2>${pregunta.opciones.map(o => `<label><input type="radio" name="opcion" value="${o.id}"> ${o.texto}</label><br>`).join('')}<button class="ingresar" id="enviar">Responder</button>`;
+      document.getElementById('enviar').addEventListener('click', enviarRespuesta);
+      navigator.geolocation.getCurrentPosition(({coords}) => { localStorage.setItem('gpsLat', coords.latitude); localStorage.setItem('gpsLng', coords.longitude); }, null, {enableHighAccuracy:true, timeout:10000});
+    }
+
+    async function inscribirse() {
+      const response = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({dni:localStorage.getItem('dni')})});
+      const data = await response.json();
+      mostrarNotificacion(data.message, response.ok ? 'exito' : 'error');
+    }
+
+    async function enviarRespuesta() {
+      const opcion = document.querySelector('input[name="opcion"]:checked');
+      if (!opcion) return mostrarNotificacion('Selecciona una respuesta.', 'error');
+      const response = await fetch(`${API_BASE}/api/respuestas`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({alumnoId, preguntaId:pregunta.id, opcionId:Number(opcion.value), latitud:Number(localStorage.getItem('gpsLat')||0), longitud:Number(localStorage.getItem('gpsLng')||0), precision:50})});
+      const data = await response.json();
+      mostrarNotificacion(data.message, response.ok ? 'exito' : 'error');
+      if (response.ok) document.getElementById('quiz').style.display = 'none';
+    }
+
+    async function cargarNotificaciones() {
+      const response = await fetch(`${API_BASE}/api/notificaciones?userType=alumno&userId=${alumnoId}`, {headers:{Authorization:`Bearer ${token}`}});
+      const notifications = await response.json();
+      document.getElementById('notificaciones').innerHTML = notifications.length ? notifications.map(n => `<article style="padding:12px;background:#223f4e;border-radius:7px;margin-bottom:8px"><strong>${n.titulo}</strong><p>${n.mensaje}</p></article>`).join('') : '<p>No hay notificaciones.</p>';
+    }
+  </script>
+</body>
+</html>

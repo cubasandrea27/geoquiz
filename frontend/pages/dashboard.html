@@ -33,9 +33,17 @@
       </select>
     </div>
 
+    <h3>Agregar pregunta</h3>
     <div class="campo">
       <label for="preguntaDocente">Pregunta</label>
       <input type="text" id="preguntaDocente" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
+    </div>
+
+    <div class="campo">
+      <label for="ubicacionPregunta">Ubicación del tema</label>
+      <select id="ubicacionPregunta">
+        <option value="">Cargando ubicaciones...</option>
+      </select>
     </div>
 
     <div class="campo">
@@ -61,6 +69,10 @@
         <option value="3">Opción 3</option>
       </select>
     </div>
+
+    <button class="ingresar" id="btnGuardarPregunta" type="button">Guardar pregunta</button>
+    <button class="ingresar" id="btnCancelarEdicionPregunta" type="button" style="display:none;">Cancelar edición</button>
+    <p id="mensajePregunta" style="margin-top:8px; min-height:20px;"></p>
 
     <div class="campo">
       <label for="temaEliminar">Eliminar tema</label>
@@ -104,6 +116,7 @@
         <option value="">Crear una ubicación nueva</option>
       </select>
     </div>
+    <button class="ingresar" id="btnEditarUbicacion" type="button" style="margin-bottom:8px;">Editar ubicación seleccionada</button>
     <div class="campo">
       <label for="ubicacionNombre">Nombre del lugar</label>
       <input type="text" id="ubicacionNombre" placeholder="Ej: Plaza Central">
@@ -183,6 +196,7 @@
     let mapaDocente = null;
     let marcadorUbicacion = null;
     let capaUbicacionesGuardadas = null;
+    let ubicacionEnEdicionId = null;
 
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
 
@@ -194,6 +208,8 @@
       document.getElementById('btnGuardarUbicacion').addEventListener('click', guardarUbicacionYPreguntaDocente);
       document.getElementById('btnUsarUbicacionActual').addEventListener('click', usarUbicacionActualDocente);
       document.getElementById('btnCrearTema').addEventListener('click', crearTemaDocente);
+      document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
+      document.getElementById('btnCancelarEdicionPregunta').addEventListener('click', cancelarEdicionPregunta);
       cargarTemasDocente();
       cargarTemasDocenteResultados();
       cargarTemasParaInscripcion();
@@ -208,62 +224,99 @@
     }
 
     async function guardarPreguntaDocente() {
-      const temaNombre = document.getElementById('temaDocente').value.trim();
+      const temaId = document.getElementById('temaDocente').value;
       const pregunta = document.getElementById('preguntaDocente').value.trim();
+      const ubicacionId = document.getElementById('ubicacionPregunta').value || null;
       const opciones = [
         document.getElementById('opcion1').value.trim(),
         document.getElementById('opcion2').value.trim(),
         document.getElementById('opcion3').value.trim()
       ];
-      const correcta = document.getElementById('respuestaCorrecta').value;
+      const respuestaCorrecta = Number(document.getElementById('respuestaCorrecta').value);
+      const mensaje = document.getElementById('mensajePregunta');
 
-      if (!temaNombre || !pregunta || opciones.some(op => !op)) {
-        alert('Completá tema, pregunta y las 3 opciones.');
+      if (!temaId || !pregunta || opciones.some(opcion => !opcion)) {
+        mensaje.textContent = 'Completá tema, pregunta y las 3 opciones.';
+        mensaje.style.color = 'crimson';
         return;
       }
 
-try {
-  const docenteId = localStorage.getItem('docenteId');
+      if (!ubicacionId) {
+        mensaje.textContent = 'Seleccioná una ubicación activa para este tema.';
+        mensaje.style.color = 'crimson';
+        return;
+      }
 
-  const temaRes = await fetch(`${API_BASE}/api/temas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: temaNombre, descripcion: 'Materia creada desde el panel docente', docenteId })
-  });
+      const method = preguntaIdEdicion ? 'PUT' : 'POST';
+      const url = preguntaIdEdicion
+        ? `${API_BASE}/api/preguntas/${preguntaIdEdicion}`
+        : `${API_BASE}/api/preguntas`;
 
-        const temaData = await temaRes.json();
-        if (!temaRes.ok) {
-          alert(temaData.error || 'No se pudo crear el tema');
-          return;
-        }
-
-        const preguntaRes = await fetch(`${API_BASE}/api/preguntas`, {
-          method: 'POST',
+      try {
+        const response = await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            temaId: temaData.id,
+            temaId,
+            ubicacionId,
             enunciado: pregunta,
             opciones,
-            respuestaCorrecta: Number(correcta)
+            respuestaCorrecta
           })
         });
+        const data = await response.json();
 
-        const preguntaData = await preguntaRes.json();
-        if (!preguntaRes.ok) {
-          alert(preguntaData.error || 'No se pudo guardar la pregunta');
+        if (!response.ok) {
+          mensaje.textContent = data.error || 'No se pudo guardar la pregunta.';
+          mensaje.style.color = 'crimson';
           return;
         }
 
-        alert('Pregunta guardada correctamente');
-        document.getElementById('temaDocente').value = '';
-        document.getElementById('preguntaDocente').value = '';
-        document.getElementById('opcion1').value = '';
-        document.getElementById('opcion2').value = '';
-        document.getElementById('opcion3').value = '';
-        await cargarTemasDocente();
+        mensaje.textContent = preguntaIdEdicion
+          ? 'Pregunta actualizada correctamente.'
+          : 'Pregunta guardada correctamente.';
+        mensaje.style.color = 'green';
+        cancelarEdicionPregunta();
+        await cargarPreguntasDelTema();
+        await cargarUbicacionesDocente();
       } catch (error) {
-        alert('No se pudo conectar con el servidor');
+        mensaje.textContent = 'No se pudo conectar con el servidor.';
+        mensaje.style.color = 'crimson';
       }
+    }
+
+    let preguntaIdEdicion = null;
+
+    function cancelarEdicionPregunta() {
+      preguntaIdEdicion = null;
+      document.getElementById('btnGuardarPregunta').textContent = 'Guardar pregunta';
+      document.getElementById('btnCancelarEdicionPregunta').style.display = 'none';
+      document.getElementById('preguntaDocente').value = '';
+      document.getElementById('opcion1').value = '';
+      document.getElementById('opcion2').value = '';
+      document.getElementById('opcion3').value = '';
+      document.getElementById('respuestaCorrecta').value = '1';
+      document.getElementById('mensajePregunta').textContent = '';
+      cargarUbicacionesPregunta();
+    }
+
+    function editarPreguntaDocente(preguntaId) {
+      const pregunta = preguntasActuales.find(item => item.id === Number(preguntaId));
+      if (!pregunta) return;
+
+      preguntaIdEdicion = pregunta.id;
+      document.getElementById('temaDocente').value = String(pregunta.temaId);
+      document.getElementById('preguntaDocente').value = pregunta.enunciado;
+      document.getElementById('ubicacionPregunta').value = String(pregunta.ubicacionId || '');
+      document.getElementById('opcion1').value = pregunta.opcion1 || '';
+      document.getElementById('opcion2').value = pregunta.opcion2 || '';
+      document.getElementById('opcion3').value = pregunta.opcion3 || '';
+      document.getElementById('respuestaCorrecta').value = String(pregunta.correcta || 1);
+      document.getElementById('btnGuardarPregunta').textContent = 'Actualizar pregunta';
+      document.getElementById('btnCancelarEdicionPregunta').style.display = 'inline-block';
+      document.getElementById('mensajePregunta').textContent = 'Editando pregunta.';
+      document.getElementById('mensajePregunta').style.color = 'orange';
+      document.getElementById('preguntaDocente').focus();
     }
 
     async function crearTemaDocente() {
@@ -408,6 +461,7 @@ try {
           select.value = temaPregunta.value;
           cargarUbicacionesDelTema();
           cargarUbicacionesDocente();
+          cargarUbicacionesPregunta();
         });
       } catch (error) {
         select.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
@@ -453,13 +507,18 @@ try {
       const contenedor = document.getElementById('preguntasDocente');
 
       const selectUbicacion = document.getElementById('ubicacionTema');
+      const temaFormulario = document.getElementById('temaDocente');
       if (selectUbicacion && selectUbicacion.value !== temaId) {
         selectUbicacion.value = temaId;
       }
-      await cargarUbicacionesDelTema();
+      if (temaFormulario && temaFormulario.value !== temaId) {
+        temaFormulario.value = temaId;
+      }
+      await cargarUbicacionesPregunta();
       await cargarUbicacionesDocente();
 
       if (!temaId) {
+        preguntasActuales = [];
         contenedor.innerHTML = '<p>Seleccioná un tema para administrar sus preguntas.</p>';
         return;
       }
@@ -467,23 +526,51 @@ try {
       try {
         const res = await fetch(`${API_BASE}/api/preguntas/todas`);
         const preguntas = await res.json();
-        const preguntasTema = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
+        preguntasActuales = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
 
-        if (!preguntasTema.length) {
+        if (!preguntasActuales.length) {
           contenedor.innerHTML = '<p>Este tema no tiene preguntas cargadas.</p>';
           return;
         }
 
-        contenedor.innerHTML = preguntasTema.map(pregunta => `
+        contenedor.innerHTML = preguntasActuales.map(pregunta => `
           <article style="border:1px solid #ccc; padding:12px; margin-bottom:10px;">
             <p><strong>${pregunta.enunciado}</strong></p>
             <p>Opciones: ${pregunta.opcion1}, ${pregunta.opcion2}, ${pregunta.opcion3}</p>
             <p>Respuesta correcta: Opción ${pregunta.correcta}</p>
-            <button type="button" onclick="eliminarPreguntaDocente(${pregunta.id})">Eliminar pregunta</button>
+            <p>Ubicación: ${pregunta.ubicacionId || 'Sin ubicación'}</p>
+            <button type="button" onclick="editarPreguntaDocente(${pregunta.id})">Editar</button>
+            <button type="button" onclick="eliminarPreguntaDocente(${pregunta.id})">Eliminar</button>
           </article>
         `).join('');
       } catch (error) {
+        preguntasActuales = [];
         contenedor.innerHTML = '<p>No se pudieron cargar las preguntas.</p>';
+      }
+    }
+
+    async function cargarUbicacionesPregunta() {
+      const temaId = document.getElementById('temaDocente').value;
+      const select = document.getElementById('ubicacionPregunta');
+      select.innerHTML = '<option value="">Cargando ubicaciones...</option>';
+
+      if (!temaId) {
+        select.innerHTML = '<option value="">Primero seleccioná un tema</option>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await res.json();
+        select.innerHTML = '<option value="">Seleccioná una ubicación</option>';
+        ubicaciones.forEach(ubicacion => {
+          const option = document.createElement('option');
+          option.value = ubicacion.id;
+          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.radio_metros} m)`;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        select.innerHTML = '<option value="">No se pudieron cargar las ubicaciones</option>';
       }
     }
 
@@ -526,6 +613,7 @@ try {
           option.dataset.latitud = ubicacion.latitud;
           option.dataset.longitud = ubicacion.longitud;
           option.dataset.radio = ubicacion.radio_metros;
+          option.dataset.temaId = temaId;
           select.appendChild(option);
         });
       } catch (error) {
@@ -627,8 +715,11 @@ try {
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones`, {
-          method: 'POST',
+        const url = ubicacionEnEdicionId
+          ? `${API_BASE}/api/ubicaciones/${ubicacionEnEdicionId}`
+          : `${API_BASE}/api/ubicaciones`;
+        const res = await fetch(url, {
+          method: ubicacionEnEdicionId ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
@@ -645,11 +736,13 @@ try {
           return;
         }
 
-        alert('Ubicación GPS guardada correctamente.');
+        alert(ubicacionEnEdicionId ? 'Ubicación actualizada correctamente.' : 'Ubicación GPS guardada correctamente.');
+        ubicacionEnEdicionId = null;
         document.getElementById('ubicacionNombre').value = '';
         document.getElementById('ubicacionLatitud').value = '';
         document.getElementById('ubicacionLongitud').value = '';
         await cargarUbicacionesDocente();
+        await cargarUbicacionesDelTema();
       } catch (error) {
         alert('No se pudo conectar con el servidor.');
       }
@@ -774,6 +867,25 @@ try {
       } catch (error) {
         contenedor.innerHTML = '<p>No se pudieron cargar las ubicaciones.</p>';
       }
+    }
+
+    async function editarUbicacionDocente() {
+      const ubicacionId = document.getElementById('ubicacionExistente').value;
+      if (!ubicacionId) {
+        alert('Seleccioná una ubicación existente para editar.');
+        return;
+      }
+
+      const opcion = document.getElementById('ubicacionExistente').selectedOptions[0];
+      if (!opcion) return;
+      ubicacionEnEdicionId = ubicacionId;
+      document.getElementById('ubicacionNombre').value = opcion.dataset.nombre;
+      document.getElementById('ubicacionLatitud').value = opcion.dataset.latitud;
+      document.getElementById('ubicacionLongitud').value = opcion.dataset.longitud;
+      document.getElementById('ubicacionRadio').value = opcion.dataset.radio;
+      document.getElementById('ubicacionTema').value = opcion.dataset.temaId;
+      seleccionarCoordenadas(Number(opcion.dataset.latitud), Number(opcion.dataset.longitud));
+      alert('Modificá los datos y guardá para actualizar la ubicación.');
     }
 
     async function eliminarUbicacionDocente(ubicacionId) {

@@ -13,5 +13,8 @@ app.use('/api/temas',      require('./routes/temas'));
 app.use('/api/preguntas',  require('./routes/preguntas'));
 app.use('/api/respuestas', require('./routes/respuestas'));
 app.use('/api/ubicaciones',require('./routes/ubicaciones'));
+app.use('/api/reportes',   require('./routes/reportes'));
+app.use('/api/usuarios',   require('./routes/usuarios'));
+app.use('/api/notificaciones', require('./routes/notifications'));
 
 module.exports = app;
