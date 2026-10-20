@@ -3,23 +3,26 @@
    ========================================================== */
 
 :root {
-  --bg: #12232E;
-  --superficie: #1B3441;
-  --superficie-2: #223F4E;
-  --borde: #2E4653;
-  --borde-fuerte: #35505E;
+  /* Paleta sobria: azul oscuro, azul grisáceo, blanco y negro */
+  --bg: #0F3040;
+  --superficie: #464858;
+  --superficie-2: #0F3040;
+  --borde: #464858;
+  --borde-fuerte: #FFFFFF;
 
-  --texto: #EDE6D6;
-  --texto-tenue: #8FA3AC;
+  --texto: #FFFFFF;
+  --texto-tenue: #FFFFFF;
 
-  --acento: #E8A33D;
-  --acento-tinta: #12232E;
+  --acento: #FFFFFF;
+  --acento-tinta: #0F3040;
 
-  --exito: #6FA287;
-  --exito-tinta: #10261B;
+  --exito: #FFFFFF;
+  --exito-tinta: #0F3040;
 
-  --error: #D9756A;
-  --error-tinta: #2E120E;
+  --error: #FFFFFF;
+  --error-tinta: #0F3040;
+
+  --fondo-gradiente: linear-gradient(135deg, #0F3040 0%, #464858 55%, #000000 100%);
 }
 
 
@@ -41,7 +44,8 @@ body {
   min-height: 100vh;
   width: 100%;
 
-  background: var(--bg);
+  background: var(--fondo-gradiente);
+  background-attachment: fixed;
   color: var(--texto);
 
   font-family: Arial, sans-serif;
@@ -234,7 +238,7 @@ body:has(.contenedor) {
 .contenedor .campo select:focus {
   border-color: var(--acento);
 
-  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.12);
+  box-shadow: 0 0 0 2px rgba(255, 203, 61, 0.18);
 }
 
 
@@ -352,7 +356,8 @@ body:not(:has(.contenedor)) {
 
   padding: 40px 20px;
 
-  background: var(--bg);
+  background: var(--fondo-gradiente);
+  background-attachment: fixed;
 }
 
 
@@ -448,6 +453,121 @@ body:not(:has(.contenedor)) > #btnCerrarSesion:hover {
   font-size: 24px;
 }
 
+/* ==========================================================
+   MENÚ DESPLEGABLE DEL PANEL DOCENTE
+   ========================================================== */
+
+.menu-hamburguesa {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 13px 16px;
+
+  background: var(--superficie-2);
+
+  border: 1px solid var(--borde);
+  border-radius: 9px;
+
+  color: var(--texto);
+
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.menu-hamburguesa:hover,
+.menu-hamburguesa[aria-expanded="true"] {
+  background: var(--superficie);
+  border-color: var(--borde-fuerte);
+}
+
+.hamburguesa-icono {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 22px;
+}
+
+.hamburguesa-icono span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--acento);
+  border-radius: 2px;
+}
+
+.hamburguesa-flecha {
+  margin-left: auto;
+  color: var(--acento);
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.menu-hamburguesa[aria-expanded="true"] .hamburguesa-flecha {
+  transform: rotate(180deg);
+}
+
+.menu-docente {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--borde);
+  border-radius: 9px;
+}
+
+.menu-docente[hidden] {
+  display: none;
+}
+
+.menu-docente button {
+  width: 100%;
+  padding: 11px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-docente button:hover {
+  background: var(--superficie);
+  border-color: var(--borde-fuerte);
+}
+
+.panel-seccion {
+  margin-bottom: 16px;
+
+  background: var(--superficie);
+
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.panel-seccion[hidden] {
+  display: none;
+}
+
+.panel-seccion-contenido {
+  padding: 6px 18px 6px;
+}
+
+.panel-seccion-contenido h3:first-child {
+  margin-top: 0;
+}
+
 
 /* ==========================================================
    CAMPOS DEL PANEL
@@ -516,7 +636,7 @@ body:not(:has(.contenedor)) > #btnCerrarSesion:hover {
 #panel-alumno .campo select:focus {
   border-color: var(--acento);
 
-  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.12);
+  box-shadow: 0 0 0 2px rgba(255, 203, 61, 0.18);
 }
 
 

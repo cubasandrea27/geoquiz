@@ -169,11 +169,24 @@ el lugar seleccionado o dentro de su radio de deteccion.
 | `POST` | `/api/docentes/login` | Autenticar docente |
 | `POST` | `/api/alumnos/register` | Registrar alumno |
 | `POST` | `/api/alumnos/login` | Autenticar alumno |
+| `POST` | `/api/alumnos/importar` | Importar alumnos desde CSV (requiere JWT de docente) |
+| `GET` | `/api/health` | Verificar disponibilidad de API y base de datos |
 | `GET` | `/api/temas` | Listar temas activos |
 | `POST` | `/api/temas` | Crear tema |
 | `POST` | `/api/ubicaciones` | Guardar coordenada GPS |
 | `GET` | `/api/preguntas?temaId=...&alumnoId=...&lat=...&lng=...` | Buscar preguntas cercanas |
 | `POST` | `/api/respuestas` | Guardar respuesta y bloqueo de 5 minutos |
+
+### Importación de alumnos
+
+El endpoint `POST /api/alumnos/importar` acepta un CSV como cuerpo (`Content-Type: text/csv`) o como campo `csv` en JSON. Las columnas obligatorias son:
+
+```csv
+nombre,apellido,dni,password
+Ana,Pérez,12345678,clave-segura
+```
+
+Se permiten hasta 1000 alumnos y archivos de hasta 2 MB. Los DNI repetidos o filas inválidas se informan en `errores` sin impedir la importación de las filas válidas.
 
 ## Credenciales de prueba
 

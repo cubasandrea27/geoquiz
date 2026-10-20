@@ -1,6 +1,8 @@
 const express = require('express');
 const router  = express.Router();
 const pool = require('../utils/db');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { docentePoseeTema } = require('../middleware/ownership');
 
 function normalizarTemaNombre(nombre = '') {
   return String(nombre)
@@ -40,8 +42,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/docente/:docenteId', async (req, res) => {
+router.get('/docente/:docenteId', authenticate, requireRole('docente'), async (req, res) => {
   const { docenteId } = req.params;
+  if (Number(docenteId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No tienes permiso para ver los temas de otro docente' });
+  }
   try {
     const [rows] = await pool.query(
       'SELECT id, nombre, descripcion, activo FROM temas WHERE docente_id = ? ORDER BY nombre ASC',
@@ -53,8 +58,9 @@ router.get('/docente/:docenteId', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
-  const { nombre, descripcion, docenteId } = req.body;
+router.post('/', authenticate, requireRole('docente'), async (req, res) => {
+  const { nombre, descripcion } = req.body;
+  const docenteId = req.user.id;
   const nombreOriginal = (nombre || '').trim();
 
   if (!nombreOriginal) {
@@ -91,7 +97,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.post('/:id/alumnos', async (req, res) => {
+router.post('/:id/alumnos', authenticate, requireRole('docente'), async (req, res) => {
   const temaId = req.params.id;
   const { dni } = req.body;
 
@@ -100,6 +106,10 @@ router.post('/:id/alumnos', async (req, res) => {
   }
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [alumnos] = await pool.query(
       'SELECT id, nombre, apellido FROM alumnos WHERE dni = ? AND activo = 1',
       [dni]
@@ -122,7 +132,7 @@ router.post('/:id/alumnos', async (req, res) => {
   }
 });
 
-router.get('/:id/alumnos', async (req, res) => {
+router.get('/:id/alumnos', authenticate, requireRole('docente'), async (req, res) => {
   const temaId = req.params.id;
 
   if (!temaId) {
@@ -130,6 +140,10 @@ router.get('/:id/alumnos', async (req, res) => {
   }
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [rows] = await pool.query(`
       SELECT a.id, a.nombre, a.apellido, a.dni
       FROM tema_alumno ta
@@ -144,7 +158,7 @@ router.get('/:id/alumnos', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, requireRole('docente'), async (req, res) => {
   const temaId = req.params.id;
   const { nombre, descripcion } = req.body;
   const nombreLimpio = (nombre || '').trim();
@@ -158,6 +172,10 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [result] = await pool.query(
       'UPDATE temas SET nombre = ?, descripcion = ? WHERE id = ? AND activo = 1',
       [nombreLimpio, descripcion || '', temaId]
@@ -174,10 +192,14 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.patch('/:id/estado', async (req, res) => {
+router.patch('/:id/estado', authenticate, requireRole('docente'), async (req, res) => {
   const temaId = req.params.id;
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [temas] = await pool.query(
       'SELECT activo FROM temas WHERE id = ?',
       [temaId]
@@ -199,7 +221,7 @@ router.patch('/:id/estado', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('docente'), async (req, res) => {
   const temaId = req.params.id;
 
   if (!temaId) {
@@ -207,6 +229,10 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [result] = await pool.query(
       'UPDATE temas SET activo = 0 WHERE id = ? AND activo = 1',
       [temaId]

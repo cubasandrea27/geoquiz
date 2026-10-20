@@ -1,4 +1,14 @@
 const pool = require('../utils/db');
+const { docentePoseeTema, docentePoseeUbicacion } = require('../middleware/ownership');
+
+function validarCoordenadas(latitud, longitud, radio) {
+  const lat = Number(latitud);
+  const lng = Number(longitud);
+  const metros = Number(radio);
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+    Number.isFinite(lng) && lng >= -180 && lng <= 180 &&
+    Number.isFinite(metros) && metros > 0 && metros <= 100000;
+}
 
 async function list(req, res) {
   const temaId = req.query.temaId;
@@ -9,8 +19,12 @@ async function list(req, res) {
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, tema_id, nombre, latitud, longitud, radio_metros FROM ubicaciones WHERE tema_id = ? AND activo = 1 ORDER BY id DESC',
-      [temaId]
+      `SELECT u.id, u.tema_id, u.nombre, u.latitud, u.longitud, u.radio_metros
+       FROM ubicaciones u
+       JOIN temas t ON t.id = u.tema_id
+       WHERE u.tema_id = ? AND t.docente_id = ? AND u.activo = 1
+       ORDER BY u.id DESC`,
+      [temaId, req.user.id]
     );
     res.json(rows);
   } catch (err) {
@@ -21,14 +35,19 @@ async function list(req, res) {
 async function create(req, res) {
   const { temaId, nombre, latitud, longitud, radio_metros } = req.body;
 
-  if (!temaId || latitud == null || longitud == null) {
+  const radio = radio_metros == null ? 50 : Number(radio_metros);
+  if (!temaId || latitud == null || longitud == null || !validarCoordenadas(latitud, longitud, radio)) {
     return res.status(400).json({ error: 'Tema, latitud y longitud son obligatorios' });
   }
 
   try {
+    if (!(await docentePoseeTema(temaId, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Tema no encontrado' });
+    }
+
     const [result] = await pool.query(
       'INSERT INTO ubicaciones (tema_id, nombre, latitud, longitud, radio_metros) VALUES (?, ?, ?, ?, ?)',
-      [temaId, nombre || null, latitud, longitud, radio_metros || 50]
+      [temaId, nombre || null, Number(latitud), Number(longitud), radio]
     );
 
     res.status(201).json({ message: 'Ubicación creada', id: result.insertId });
@@ -50,8 +69,13 @@ async function createWithQuestion(req, res) {
     respuestaCorrecta
   } = req.body;
 
-  if (!temaId || latitud == null || longitud == null || !enunciado ||
-      !Array.isArray(opciones) || opciones.length !== 3 || !respuestaCorrecta) {
+  const radio = radio_metros == null ? 50 : Number(radio_metros);
+  const opcionesValidas = Array.isArray(opciones) && opciones.length === 3 &&
+    opciones.every((opcion) => typeof opcion === 'string' && opcion.trim().length > 0);
+  const correctaValida = Number.isInteger(Number(respuestaCorrecta)) && Number(respuestaCorrecta) >= 1 && Number(respuestaCorrecta) <= 3;
+
+  if (!temaId || latitud == null || longitud == null || !validarCoordenadas(latitud, longitud, radio) || !enunciado ||
+      !opcionesValidas || !correctaValida) {
     return res.status(400).json({ error: 'Completá ubicación, pregunta y las 3 opciones' });
   }
 
@@ -61,8 +85,8 @@ async function createWithQuestion(req, res) {
     await connection.beginTransaction();
 
     const [temas] = await connection.query(
-      'SELECT id FROM temas WHERE id = ? AND activo = 1',
-      [temaId]
+      'SELECT id FROM temas WHERE id = ? AND docente_id = ? AND activo = 1',
+      [temaId, req.user.id]
     );
 
     if (!temas.length) {
@@ -86,7 +110,7 @@ async function createWithQuestion(req, res) {
       const [ubicacion] = await connection.query(
         `INSERT INTO ubicaciones (tema_id, nombre, latitud, longitud, radio_metros)
          VALUES (?, ?, ?, ?, ?)`,
-        [temaId, nombre || null, latitud, longitud, radio_metros || 50]
+        [temaId, nombre || null, Number(latitud), Number(longitud), radio]
       );
       ubicacionSeleccionada = ubicacion.insertId;
     }
@@ -98,7 +122,7 @@ async function createWithQuestion(req, res) {
 
     const valoresOpciones = opciones.map((texto, index) => [
       pregunta.insertId,
-      texto,
+      texto.trim(),
       index + 1 === Number(respuestaCorrecta) ? 1 : 0
     ]);
 
@@ -126,14 +150,19 @@ async function update(req, res) {
   const { id } = req.params;
   const { nombre, latitud, longitud, radio_metros } = req.body;
 
-  if (latitud == null || longitud == null) {
+  const radio = radio_metros == null ? 50 : Number(radio_metros);
+  if (latitud == null || longitud == null || !validarCoordenadas(latitud, longitud, radio)) {
     return res.status(400).json({ error: 'Latitud y longitud son obligatorias' });
   }
 
   try {
+    if (!(await docentePoseeUbicacion(id, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Ubicación no encontrada' });
+    }
+
     const [result] = await pool.query(
       'UPDATE ubicaciones SET nombre = ?, latitud = ?, longitud = ?, radio_metros = ? WHERE id = ? AND activo = 1',
-      [nombre || null, latitud, longitud, radio_metros || 50, id]
+      [nombre || null, Number(latitud), Number(longitud), radio, id]
     );
 
     if (!result.affectedRows) {
@@ -150,6 +179,10 @@ async function remove(req, res) {
   const { id } = req.params;
 
   try {
+    if (!(await docentePoseeUbicacion(id, req.user.id, { activo: true }))) {
+      return res.status(404).json({ error: 'Ubicación no encontrada' });
+    }
+
     const [result] = await pool.query(
       'UPDATE ubicaciones SET activo = 0 WHERE id = ? AND activo = 1',
       [id]

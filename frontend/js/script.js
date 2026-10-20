@@ -5,9 +5,19 @@ function getBasePath() {
   return window.location.pathname.includes('/frontend/pages/') ? '' : 'frontend/pages/';
 }
 
+function getDashboardPath() {
+  // Fuerza a cargar la versión actual de la pantalla después del login y evita
+  // que el navegador reutilice un dashboard anterior sin el envío del JWT.
+  return `${getBasePath()}dashboard.html?v=auth-fix-20261020`;
+}
+
 function redirectIfLoggedIn() {
-  if (localStorage.getItem('isLoggedIn') === 'true') {
+  if (localStorage.getItem('isLoggedIn') === 'true' && localStorage.getItem('token')) {
     window.location.href = `${getBasePath()}dashboard.html`;
+  } else if (localStorage.getItem('isLoggedIn') === 'true' && !localStorage.getItem('token')) {
+    // Sesión creada por una versión anterior que todavía no guardaba JWT.
+    // Se limpia para permitir un nuevo inicio de sesión sin bucles de redirección.
+    localStorage.clear();
   }
 }
 
@@ -98,18 +108,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (!data.token) {
+        alert('El servidor no devolvió una sesión válida. Reiniciá el backend e intentá nuevamente.');
+        return;
+      }
+
       localStorage.setItem('rol', data.rol);
       localStorage.setItem('dni', rolSeleccionado === 'alumno' ? credencial : '');
       localStorage.setItem('email', rolSeleccionado === 'docente' ? credencial : '');
       localStorage.setItem('nombre', data.nombre || '');
       localStorage.setItem('userId', data.id || '');
       localStorage.setItem('docenteId', data.id || '');
+      localStorage.setItem('token', data.token || '');
       localStorage.setItem('isLoggedIn', 'true');
-      if (data.rol === 'docente') {
-        window.location.href = `${getBasePath()}dashboard.html`;
-      } else {
-        window.location.href = `${getBasePath()}dashboard.html`;
-      }
+      window.location.href = getDashboardPath();
     } catch (error) {
       alert('No se pudo conectar con el servidor.');
     }

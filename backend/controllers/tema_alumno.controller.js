@@ -1,7 +1,8 @@
 const pool = require('../utils/db');
 
 async function inscribirse(req, res) {
-  const { alumnoId, temaId } = req.body;
+  const { temaId } = req.body;
+  const alumnoId = req.user.id;
   
   if (!alumnoId || !temaId) {
     return res.status(400).json({ error: 'alumnoId y temaId son requeridos' });
@@ -47,6 +48,9 @@ async function obtenerInscripciones(req, res) {
   if (!alumnoId) {
     return res.status(400).json({ error: 'ID de alumno requerido' });
   }
+  if (Number(alumnoId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar las inscripciones de otro alumno' });
+  }
 
   try {
     const [rows] = await pool.query(`
@@ -65,7 +69,8 @@ async function obtenerInscripciones(req, res) {
 }
 
 async function verificarInscripcion(req, res) {
-  const { alumnoId, temaId } = req.query;
+  const { temaId } = req.query;
+  const alumnoId = req.user.id;
   
   if (!alumnoId || !temaId) {
     return res.status(400).json({ error: 'alumnoId y temaId son requeridos' });

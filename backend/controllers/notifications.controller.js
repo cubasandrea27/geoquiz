@@ -5,6 +5,10 @@ async function list(req, res) {
   if (!userType || !userId) {
     return res.status(400).json({ error: 'userType y userId son requeridos' });
   }
+  const tipoEsperado = req.user.rol;
+  if (userType !== tipoEsperado || Number(userId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar notificaciones de otro usuario' });
+  }
 
   try {
     const [rows] = await pool.query(
@@ -44,8 +48,8 @@ async function markRead(req, res) {
   const { id } = req.params;
   try {
     const [result] = await pool.query(
-      'UPDATE notificaciones SET leida = 1 WHERE id = ? AND leida = 0',
-      [id]
+      'UPDATE notificaciones SET leida = 1 WHERE id = ? AND destinatario_tipo = ? AND destinatario_id = ? AND leida = 0',
+      [id, req.user.rol, req.user.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Notificación no encontrada' });
     res.json({ message: 'Notificación marcada como leída' });

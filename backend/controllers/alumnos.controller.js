@@ -1,18 +1,20 @@
 const pool    = require('../utils/db');
 const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');
-
-function getJwtSecret() {
-  return process.env.JWT_SECRET || 'geoquiz-secret-local';
-}
+const { signToken } = require('../utils/jwt');
 
 async function register(req, res) {
-  const { nombre, apellido, dni, password } = req.body;
-  if (!nombre || !apellido || !dni) {
-    return res.status(400).json({ error: 'Nombre, apellido y DNI son obligatorios' });
+  const nombre = String(req.body.nombre || '').trim();
+  const apellido = String(req.body.apellido || '').trim();
+  const dni = String(req.body.dni || '').trim();
+  const password = String(req.body.password || '');
+  if (!nombre || !apellido || !dni || !password) {
+    return res.status(400).json({ error: 'Nombre, apellido, DNI y contraseña son obligatorios' });
+  }
+  if (!/^\d{7,8}$/.test(dni) || password.length < 8) {
+    return res.status(400).json({ error: 'DNI inválido o contraseña demasiado corta (mínimo 8 caracteres)' });
   }
   try {
-    const hash = await bcrypt.hash(password || dni, 10);
+    const hash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
       'INSERT INTO alumnos (nombre, apellido, dni, password) VALUES (?, ?, ?, ?)',
       [nombre, apellido, dni, hash]
@@ -27,18 +29,17 @@ async function register(req, res) {
 }
 
 async function login(req, res) {
-  const { dni, password } = req.body;
-  if (!dni) return res.status(400).json({ error: 'DNI obligatorio' });
+  const dni = String(req.body.dni || '').trim();
+  const password = String(req.body.password || '');
+  if (!/^\d{7,8}$/.test(dni) || !password) return res.status(400).json({ error: 'DNI y contraseña son obligatorios' });
   try {
     const [rows] = await pool.query('SELECT * FROM alumnos WHERE dni = ? AND activo = 1', [dni]);
     if (rows.length === 0) return res.status(401).json({ error: 'DNI no encontrado' });
     const alumno = rows[0];
-    const match = await bcrypt.compare(password || dni, alumno.password);
+    const match = await bcrypt.compare(password, alumno.password);
     if (!match) return res.status(401).json({ error: 'Contraseña incorrecta' });
-    const token = jwt.sign(
+    const token = signToken(
       { id: alumno.id, rol: 'alumno' },
-      getJwtSecret(),
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
     res.json({ token, nombre: alumno.nombre, rol: 'alumno', id: alumno.id });
   } catch (err) {

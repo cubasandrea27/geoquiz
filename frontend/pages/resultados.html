@@ -18,7 +18,7 @@
   <script>
     const alumnoId = localStorage.getItem('userId');
 
-    if (localStorage.getItem('rol') !== 'alumno' || localStorage.getItem('isLoggedIn') !== 'true' || !alumnoId) {
+    if (localStorage.getItem('rol') !== 'alumno' || localStorage.getItem('isLoggedIn') !== 'true' || !alumnoId || !localStorage.getItem('token')) {
       window.location.href = 'index.html';
     }
 
@@ -26,7 +26,9 @@
       const estado = document.getElementById('estado');
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/alumno/${alumnoId}`);
+        const res = await fetch(`${API_BASE}/api/respuestas/alumno/${alumnoId}`, {
+          headers: getAuthHeaders()
+        });
         const resultados = await res.json();
 
         if (!res.ok) {
@@ -39,7 +41,7 @@
         }
 
         estado.innerHTML = resultados.map(tema => `
-          <section style="margin:20px 0; padding:16px; border:1px solid #ccc;">
+          <section style="margin:20px 0; padding:16px; border:1px solid var(--borde);">
             <h2>${tema.tema_nombre}</h2>
             <p><strong>Puntaje:</strong> ${tema.correctas} de ${tema.correctas + tema.incorrectas}</p>
             <p><strong>Correctas:</strong> ${tema.correctas} | <strong>Incorrectas:</strong> ${tema.incorrectas}</p>
@@ -48,7 +50,7 @@
                 <li style="margin:8px 0;">
                   ${respuesta.pregunta}<br>
                   <strong>Respuesta:</strong> ${respuesta.opcion_elegida}
-                  <span style="color:${respuesta.resultado === 'Correcto' ? 'green' : 'crimson'};">(${respuesta.resultado})</span>
+                  <span style="color:${respuesta.resultado === 'Correcto' ? 'var(--exito)' : 'var(--error)'};">(${respuesta.resultado})</span>
                 </li>
               `).join('')}
             </ul>

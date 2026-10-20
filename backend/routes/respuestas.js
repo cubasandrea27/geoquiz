@@ -1,12 +1,16 @@
 const express = require('express');
 const router  = express.Router();
 const pool = require('../utils/db');
+const { authenticate, requireRole } = require('../middleware/auth');
 
-router.get('/alumno/:alumnoId', async (req, res) => {
+router.get('/alumno/:alumnoId', authenticate, requireRole('alumno'), async (req, res) => {
   const { alumnoId } = req.params;
 
   if (!alumnoId) {
     return res.status(400).json({ error: 'Falta el alumnoId' });
+  }
+  if (Number(alumnoId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar las respuestas de otro alumno' });
   }
 
   try {
@@ -62,11 +66,14 @@ router.get('/alumno/:alumnoId', async (req, res) => {
 // los temas de un docente. Sirve para la sección "Ver respuestas" del
 // panel docente, incluyendo el tema al que pertenece cada pregunta para
 // poder filtrar del lado del cliente sin pegarle de nuevo a la API.
-router.get('/docente/:docenteId', async (req, res) => {
+router.get('/docente/:docenteId', authenticate, requireRole('docente'), async (req, res) => {
   const { docenteId } = req.params;
 
   if (!docenteId) {
     return res.status(400).json({ error: 'Falta el docenteId' });
+  }
+  if (Number(docenteId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar las respuestas de otro docente' });
   }
 
   try {
@@ -75,6 +82,7 @@ router.get('/docente/:docenteId', async (req, res) => {
         a.id AS alumno_id,
         a.nombre,
         a.apellido,
+        a.dni,
         p.id AS pregunta_id,
         p.enunciado AS pregunta,
         t.id AS tema_id,
@@ -103,6 +111,7 @@ router.get('/docente/:docenteId', async (req, res) => {
           alumno_id: row.alumno_id,
           nombre: row.nombre,
           apellido: row.apellido,
+          dni: row.dni,
           respuestas: []
         };
       }
@@ -126,16 +135,20 @@ router.get('/docente/:docenteId', async (req, res) => {
 });
 
 // Registrar la respuesta de un alumno a una pregunta.
-router.post('/', async (req, res) => {
-  const { alumnoId, preguntaId, opcionId, latitud, longitud, precision } = req.body;
+router.post('/', authenticate, requireRole('alumno'), async (req, res) => {
+  const { preguntaId, opcionId, latitud, longitud, precision } = req.body;
+  const alumnoId = req.user.id;
 
-  if (!alumnoId || !preguntaId || !opcionId) {
-    return res.status(400).json({ error: 'alumnoId, preguntaId y opcionId son requeridos' });
+  if (!preguntaId || !opcionId) {
+    return res.status(400).json({ error: 'preguntaId y opcionId son requeridos' });
   }
 
   const lat = Number(latitud);
   const lng = Number(longitud);
   const margenGps = Number(precision) > 0 ? Number(precision) : 0;
+  if (!Number.isFinite(margenGps) || margenGps < 0 || margenGps > 100000) {
+    return res.status(400).json({ error: 'La precisión GPS no es válida' });
+  }
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return res.status(400).json({ error: 'Se requiere una ubicación GPS válida' });
   }
@@ -234,7 +247,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/por-tema/:temaId', async (req, res) => {
+router.get('/por-tema/:temaId', authenticate, requireRole('docente'), async (req, res) => {
   const { temaId } = req.params;
 
   if (!temaId) {
@@ -258,10 +271,11 @@ router.get('/por-tema/:temaId', async (req, res) => {
       FROM respuestas r
       JOIN alumnos a ON a.id = r.alumno_id
       JOIN preguntas p ON p.id = r.pregunta_id
+      JOIN temas t ON t.id = p.tema_id
       LEFT JOIN opciones o ON o.id = r.opcion_id
-      WHERE p.tema_id = ?
+      WHERE p.tema_id = ? AND t.docente_id = ?
       ORDER BY a.apellido, a.nombre, p.id ASC
-    `, [temaId]);
+    `, [temaId, req.user.id]);
 
     const resultados = {};
 

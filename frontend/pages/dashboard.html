@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
   <title>GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -14,142 +15,168 @@
   <div id="panel-docente" style="display:none;">
     <h2>Panel Docente</h2>
 
-    <h3>Crear tema</h3>
-    <div class="campo">
-      <label for="nuevoTemaNombre">Nombre del tema</label>
-      <input type="text" id="nuevoTemaNombre" placeholder="Ej: Historia Argentina">
-    </div>
-    <div class="campo">
-      <label for="nuevoTemaDescripcion">Descripción</label>
-      <input type="text" id="nuevoTemaDescripcion" placeholder="Descripción del tema">
-    </div>
-    <button class="ingresar" id="btnCrearTema" type="button">Crear tema</button>
-    <p id="mensajeTema" style="margin-top:8px;"></p>
+    <button class="menu-hamburguesa" id="btnMenuDocente" type="button" aria-expanded="false" aria-controls="menuDocente">
+      <span class="hamburguesa-icono" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <span>Menú docente</span>
+      <span class="hamburguesa-flecha" aria-hidden="true">⌄</span>
+    </button>
 
-    <div class="campo">
-      <label for="temaDocente">Tema / materia</label>
-      <select id="temaDocente">
-        <option value="">Cargando temas...</option>
-      </select>
-    </div>
+    <nav class="menu-docente" id="menuDocente" aria-label="Secciones del panel docente" hidden>
+      <button type="button" data-menu-target="seccion-contenido">Temas, preguntas y ubicaciones</button>
+      <button type="button" data-menu-target="seccion-alumnos-resultados">Alumnos y resultados</button>
+    </nav>
 
-    <h3>Agregar pregunta</h3>
-    <div class="campo">
-      <label for="preguntaDocente">Pregunta</label>
-      <input type="text" id="preguntaDocente" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
-    </div>
+    <section class="panel-seccion" id="seccion-contenido">
+      <div class="panel-seccion-contenido">
+        <h3>Crear tema</h3>
+        <div class="campo">
+          <label for="nuevoTemaNombre">Nombre del tema</label>
+          <input type="text" id="nuevoTemaNombre" placeholder="Ej: Historia Argentina">
+        </div>
+        <div class="campo">
+          <label for="nuevoTemaDescripcion">Descripción</label>
+          <input type="text" id="nuevoTemaDescripcion" placeholder="Descripción del tema">
+        </div>
+        <button class="ingresar" id="btnCrearTema" type="button">Crear tema</button>
+        <p id="mensajeTema" style="margin-top:8px;"></p>
 
-    <div class="campo">
-      <label for="ubicacionPregunta">Ubicación del tema</label>
-      <select id="ubicacionPregunta">
-        <option value="">Cargando ubicaciones...</option>
-      </select>
-    </div>
+        <div class="campo">
+          <label for="temaDocente">Tema / materia</label>
+          <select id="temaDocente">
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
 
-    <div class="campo">
-      <label for="opcion1">Opción 1</label>
-      <input type="text" id="opcion1" placeholder="Respuesta 1">
-    </div>
+        <h3>Preguntas y respuestas</h3>
+        <div class="campo">
+          <label for="preguntaDocente">Pregunta</label>
+          <input type="text" id="preguntaDocente" placeholder="Ej: ¿Qué lenguaje se usa para crear páginas web?">
+        </div>
 
-    <div class="campo">
-      <label for="opcion2">Opción 2</label>
-      <input type="text" id="opcion2" placeholder="Respuesta 2">
-    </div>
+        <div class="campo">
+          <label for="ubicacionPregunta">Ubicación del tema</label>
+          <select id="ubicacionPregunta">
+            <option value="">Cargando ubicaciones...</option>
+          </select>
+        </div>
 
-    <div class="campo">
-      <label for="opcion3">Opción 3</label>
-      <input type="text" id="opcion3" placeholder="Respuesta 3">
-    </div>
+        <div class="campo">
+          <label for="opcion1">Opción 1</label>
+          <input type="text" id="opcion1" placeholder="Respuesta 1">
+        </div>
 
-    <div class="campo">
-      <label for="respuestaCorrecta">Respuesta correcta</label>
-      <select id="respuestaCorrecta">
-        <option value="1">Opción 1</option>
-        <option value="2">Opción 2</option>
-        <option value="3">Opción 3</option>
-      </select>
-    </div>
+        <div class="campo">
+          <label for="opcion2">Opción 2</label>
+          <input type="text" id="opcion2" placeholder="Respuesta 2">
+        </div>
 
-    <button class="ingresar" id="btnGuardarPregunta" type="button">Guardar pregunta</button>
-    <button class="ingresar" id="btnCancelarEdicionPregunta" type="button" style="display:none;">Cancelar edición</button>
-    <p id="mensajePregunta" style="margin-top:8px; min-height:20px;"></p>
+        <div class="campo">
+          <label for="opcion3">Opción 3</label>
+          <input type="text" id="opcion3" placeholder="Respuesta 3">
+        </div>
 
-    <div class="campo">
-      <label for="temaEliminar">Eliminar tema</label>
-      <select id="temaEliminar">
-        <option value="">Cargando temas...</option>
-      </select>
-    </div>
+        <div class="campo">
+          <label for="respuestaCorrecta">Respuesta correcta</label>
+          <select id="respuestaCorrecta">
+            <option value="1">Opción 1</option>
+            <option value="2">Opción 2</option>
+            <option value="3">Opción 3</option>
+          </select>
+        </div>
 
-    <div class="campo">
-      <label for="temaResultados">Ver resultados de alumnos</label>
-      <select id="temaResultados">
-        <option value="">Cargando temas...</option>
-      </select>
-    </div>
+        <button class="ingresar" id="btnGuardarPregunta" type="button">Guardar pregunta</button>
+        <button class="ingresar" id="btnCancelarEdicionPregunta" type="button" style="display:none;">Cancelar edición</button>
+        <p id="mensajePregunta" style="margin-top:8px; min-height:20px;"></p>
 
-    <div class="campo">
-      <label for="temaAlumno">Registrar alumno a un tema</label>
-      <select id="temaAlumno">
-        <option value="">Cargando temas...</option>
-      </select>
-    </div>
+        <div class="campo">
+          <label for="temaEliminar">Eliminar tema</label>
+          <select id="temaEliminar">
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
 
-    <div class="campo">
-      <label for="alumnoDni">DNI del alumno</label>
-      <input type="text" id="alumnoDni" placeholder="Ej: 40123456" maxlength="8" pattern="[0-9]*" inputmode="numeric">
-    </div>
+        <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
 
-    <h3>Ubicaciones GPS</h3>
-    <p>Seleccioná un punto en el mapa para cargar sus coordenadas automáticamente.</p>
-    <div id="mapaUbicaciones" style="height:350px; width:100%; margin:12px 0; border:1px solid #ccc;"></div>
-    <button class="ingresar" id="btnUsarUbicacionActual" type="button" style="margin-bottom:8px;">Usar mi ubicación actual</button>
-    <div class="campo">
-      <label for="ubicacionTema">Tema de la ubicación</label>
-      <select id="ubicacionTema">
-        <option value="">Cargando temas...</option>
-      </select>
-    </div>
-    <div class="campo">
-      <label for="ubicacionExistente">Ubicación existente (opcional)</label>
-      <select id="ubicacionExistente">
-        <option value="">Crear una ubicación nueva</option>
-      </select>
-    </div>
-    <button class="ingresar" id="btnEditarUbicacion" type="button" style="margin-bottom:8px;">Editar ubicación seleccionada</button>
-    <div class="campo">
-      <label for="ubicacionNombre">Nombre del lugar</label>
-      <input type="text" id="ubicacionNombre" placeholder="Ej: Plaza Central">
-    </div>
-    <div class="campo">
-      <label for="ubicacionLatitud">Latitud</label>
-      <input type="number" id="ubicacionLatitud" step="any" placeholder="Ej: -34.6037">
-    </div>
-    <div class="campo">
-      <label for="ubicacionLongitud">Longitud</label>
-      <input type="number" id="ubicacionLongitud" step="any" placeholder="Ej: -58.3816">
-    </div>
-    <div class="campo">
-      <label for="ubicacionRadio">Radio de detección en metros</label>
-      <input type="number" id="ubicacionRadio" min="1" value="50">
-    </div>
-    <button class="ingresar" id="btnGuardarUbicacion" type="button" style="margin-top:8px;">Guardar ubicación y pregunta</button>
-    <div id="ubicacionesDocente" style="margin-top:16px;"></div>
+        <h3>Ubicaciones GPS</h3>
+        <p>Seleccioná un punto en el mapa para cargar sus coordenadas automáticamente.</p>
+        <div id="mapaUbicaciones" style="height:350px; width:100%; margin:12px 0; border:1px solid var(--borde);"></div>
+        <button class="ingresar" id="btnUsarUbicacionActual" type="button" style="margin-bottom:8px;">Usar mi ubicación actual</button>
+        <div class="campo">
+          <label for="ubicacionTema">Tema de la ubicación</label>
+          <select id="ubicacionTema">
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="ubicacionExistente">Ubicación existente (opcional)</label>
+          <select id="ubicacionExistente">
+            <option value="">Crear una ubicación nueva</option>
+          </select>
+        </div>
+        <button class="ingresar" id="btnEditarUbicacion" type="button" style="margin-bottom:8px;">Editar ubicación seleccionada</button>
+        <div class="campo">
+          <label for="ubicacionNombre">Nombre del lugar</label>
+          <input type="text" id="ubicacionNombre" placeholder="Ej: Plaza Central">
+        </div>
+        <div class="campo">
+          <label for="ubicacionLatitud">Latitud</label>
+          <input type="number" id="ubicacionLatitud" step="any" placeholder="Ej: -34.6037">
+        </div>
+        <div class="campo">
+          <label for="ubicacionLongitud">Longitud</label>
+          <input type="number" id="ubicacionLongitud" step="any" placeholder="Ej: -58.3816">
+        </div>
+        <div class="campo">
+          <label for="ubicacionRadio">Radio de detección en metros</label>
+          <input type="number" id="ubicacionRadio" min="1" value="50">
+        </div>
+        <button class="ingresar" id="btnGuardarUbicacion" type="button" style="margin-top:8px;">Guardar ubicación y pregunta</button>
+        <div id="ubicacionesDocente" style="margin-top:16px;"></div>
 
-    <h3>Administrar preguntas</h3>
-    <div class="campo">
-      <label for="preguntasTemaFiltro">Tema</label>
-      <select id="preguntasTemaFiltro">
-        <option value="">Seleccioná un tema</option>
-      </select>
-    </div>
-    <div id="preguntasDocente" style="margin-top:16px;"></div>
+        <h3>Administrar preguntas existentes</h3>
+        <div class="campo">
+          <label for="preguntasTemaFiltro">Tema</label>
+          <select id="preguntasTemaFiltro">
+            <option value="">Seleccioná un tema</option>
+          </select>
+        </div>
+        <div id="preguntasDocente" style="margin-top:16px;"></div>
+      </div>
+    </section>
 
-    <button class="ingresar" id="btnRegistrarAlumnoTema" type="button" style="margin-top:8px;">Registrar alumno al tema</button>
-    <button class="ingresar" id="btnBorrarTema" type="button" style="margin-top:8px;">Borrar tema seleccionado</button>
-    <button class="ingresar" id="btnVerResultados" type="button" style="margin-top:8px;">Ver resultados</button>
+    <section class="panel-seccion" id="seccion-alumnos-resultados" hidden>
+      <div class="panel-seccion-contenido">
+        <h3>Registrar alumno a un tema</h3>
+        <div class="campo">
+          <label for="temaAlumno">Tema</label>
+          <select id="temaAlumno">
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
 
-    <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
+        <div class="campo">
+          <label for="alumnoDni">DNI del alumno</label>
+          <input type="text" id="alumnoDni" placeholder="Ej: 40123456" maxlength="8" pattern="[0-9]*" inputmode="numeric">
+        </div>
+        <button class="ingresar" id="btnRegistrarAlumnoTema" type="button">Registrar alumno al tema</button>
+
+        <h3>Ver resultados</h3>
+        <div class="campo">
+          <label for="temaResultados">Tema</label>
+          <select id="temaResultados">
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="filtroAlumnoDniResultados">Filtrar alumnos por DNI</label>
+          <input type="text" id="filtroAlumnoDniResultados" placeholder="Ingresá el DNI o parte del DNI" maxlength="8" inputmode="numeric">
+        </div>
+        <button class="ingresar" id="btnVerResultados" type="button">Ver resultados</button>
+        <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
+      </div>
+    </section>
   </div>
 
   <div id="panel-alumno" style="display:none;">
@@ -178,7 +205,7 @@
   <script>
     const rol = localStorage.getItem('rol');
 
-    if (!rol || localStorage.getItem('isLoggedIn') !== 'true') {
+    if (!rol || localStorage.getItem('isLoggedIn') !== 'true' || !localStorage.getItem('token')) {
       window.location.href = 'index.html';
       throw new Error('No autenticado');
     }
@@ -199,6 +226,45 @@
     let ubicacionEnEdicionId = null;
 
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
+
+    const btnMenuDocente = document.getElementById('btnMenuDocente');
+    const menuDocente = document.getElementById('menuDocente');
+
+    if (btnMenuDocente && menuDocente) {
+      const cerrarMenuDocente = () => {
+        menuDocente.hidden = true;
+        btnMenuDocente.setAttribute('aria-expanded', 'false');
+      };
+
+      btnMenuDocente.addEventListener('click', event => {
+        event.stopPropagation();
+        const mostrarMenu = menuDocente.hidden;
+        menuDocente.hidden = !mostrarMenu;
+        btnMenuDocente.setAttribute('aria-expanded', String(mostrarMenu));
+      });
+
+      menuDocente.querySelectorAll('[data-menu-target]').forEach(opcion => {
+        opcion.addEventListener('click', () => {
+          const destino = document.getElementById(opcion.dataset.menuTarget);
+          if (!destino) return;
+
+          document.querySelectorAll('.panel-seccion').forEach(seccion => {
+            seccion.hidden = seccion !== destino;
+          });
+          cerrarMenuDocente();
+          destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (destino.id === 'seccion-contenido' && mapaDocente) {
+            setTimeout(() => mapaDocente.invalidateSize(), 0);
+          }
+        });
+      });
+
+      document.addEventListener('click', event => {
+        if (!menuDocente.contains(event.target) && !btnMenuDocente.contains(event.target)) {
+          cerrarMenuDocente();
+        }
+      });
+    }
 
     if (rol === 'docente') {
       document.getElementById('panel-docente').style.display = 'block';
@@ -237,13 +303,13 @@
 
       if (!temaId || !pregunta || opciones.some(opcion => !opcion)) {
         mensaje.textContent = 'Completá tema, pregunta y las 3 opciones.';
-        mensaje.style.color = 'crimson';
+        mensaje.style.color = 'var(--error)';
         return;
       }
 
       if (!ubicacionId) {
         mensaje.textContent = 'Seleccioná una ubicación activa para este tema.';
-        mensaje.style.color = 'crimson';
+        mensaje.style.color = 'var(--error)';
         return;
       }
 
@@ -255,7 +321,7 @@
       try {
         const response = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             temaId,
             ubicacionId,
@@ -268,20 +334,20 @@
 
         if (!response.ok) {
           mensaje.textContent = data.error || 'No se pudo guardar la pregunta.';
-          mensaje.style.color = 'crimson';
+          mensaje.style.color = 'var(--error)';
           return;
         }
 
         mensaje.textContent = preguntaIdEdicion
           ? 'Pregunta actualizada correctamente.'
           : 'Pregunta guardada correctamente.';
-        mensaje.style.color = 'green';
+        mensaje.style.color = 'var(--exito)';
         cancelarEdicionPregunta();
         await cargarPreguntasDelTema();
         await cargarUbicacionesDocente();
       } catch (error) {
         mensaje.textContent = 'No se pudo conectar con el servidor.';
-        mensaje.style.color = 'crimson';
+        mensaje.style.color = 'var(--error)';
       }
     }
 
@@ -323,30 +389,29 @@
       const nombre = document.getElementById('nuevoTemaNombre').value.trim();
       const descripcion = document.getElementById('nuevoTemaDescripcion').value.trim();
       const mensaje = document.getElementById('mensajeTema');
-      const docenteId = localStorage.getItem('userId');
 
       if (!nombre) {
         mensaje.textContent = 'Ingresá el nombre del tema.';
-        mensaje.style.color = 'crimson';
+        mensaje.style.color = 'var(--error)';
         return;
       }
 
       try {
         const res = await fetch(`${API_BASE}/api/temas`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, descripcion, docenteId })
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ nombre, descripcion })
         });
         const data = await res.json();
 
         if (!res.ok) {
           mensaje.textContent = data.error || 'No se pudo crear el tema.';
-          mensaje.style.color = 'crimson';
+          mensaje.style.color = 'var(--error)';
           return;
         }
 
         mensaje.textContent = `Tema creado: ${data.nombre || nombre}. Ahora podés cargarle una ubicación.`;
-        mensaje.style.color = 'green';
+        mensaje.style.color = 'var(--exito)';
         document.getElementById('nuevoTemaNombre').value = '';
         document.getElementById('nuevoTemaDescripcion').value = '';
         await Promise.all([
@@ -359,7 +424,7 @@
         await cargarUbicacionesDocente();
       } catch (error) {
         mensaje.textContent = 'No se pudo conectar con el servidor.';
-        mensaje.style.color = 'crimson';
+        mensaje.style.color = 'var(--error)';
       }
     }
 
@@ -534,7 +599,7 @@
         }
 
         contenedor.innerHTML = preguntasActuales.map(pregunta => `
-          <article style="border:1px solid #ccc; padding:12px; margin-bottom:10px;">
+          <article style="border:1px solid var(--borde); padding:12px; margin-bottom:10px;">
             <p><strong>${pregunta.enunciado}</strong></p>
             <p>Opciones: ${pregunta.opcion1}, ${pregunta.opcion2}, ${pregunta.opcion3}</p>
             <p>Respuesta correcta: Opción ${pregunta.correcta}</p>
@@ -560,7 +625,9 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
+          headers: getAuthHeaders()
+        });
         const ubicaciones = await res.json();
         select.innerHTML = '<option value="">Seleccioná una ubicación</option>';
         ubicaciones.forEach(ubicacion => {
@@ -579,7 +646,8 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: getAuthHeaders()
         });
         const data = await res.json();
 
@@ -603,7 +671,9 @@
       if (!temaId) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
+          headers: getAuthHeaders()
+        });
         const ubicaciones = await res.json();
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
@@ -720,7 +790,7 @@
           : `${API_BASE}/api/ubicaciones`;
         const res = await fetch(url, {
           method: ubicacionEnEdicionId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             temaId,
             nombre,
@@ -791,7 +861,7 @@
       try {
         const res = await fetch(`${API_BASE}/api/ubicaciones/con-pregunta`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             temaId,
             ubicacionId: ubicacionId || null,
@@ -895,7 +965,8 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: getAuthHeaders()
         });
         const data = await res.json();
 
@@ -932,7 +1003,7 @@
       try {
         const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ dni })
         });
 
@@ -964,7 +1035,8 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: getAuthHeaders()
         });
 
         const data = await res.json();
@@ -992,11 +1064,25 @@
       contenedor.innerHTML = '<p>Cargando resultados...</p>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
-        const resultados = await res.json();
+        const res = await fetch(`${API_BASE}/api/respuestas/por-tema/${temaId}`, {
+          headers: getAuthHeaders()
+        });
+        const respuesta = await res.json();
+
+        if (!res.ok) {
+          contenedor.innerHTML = `<p>${respuesta.error || 'No se pudieron cargar los resultados.'}</p>`;
+          return;
+        }
+
+        const filtroDni = document.getElementById('filtroAlumnoDniResultados').value.trim();
+        const resultados = Array.isArray(respuesta)
+          ? respuesta.filter(alumno => !filtroDni || String(alumno.dni || '').includes(filtroDni))
+          : [];
 
         if (!resultados.length) {
-          contenedor.innerHTML = '<p>No hay respuestas registradas para este tema aún.</p>';
+          contenedor.innerHTML = filtroDni
+            ? '<p>No hay resultados para el DNI ingresado.</p>'
+            : '<p>No hay respuestas registradas para este tema aún.</p>';
           return;
         }
 
@@ -1006,8 +1092,9 @@
           `).join('');
 
           return `
-            <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+            <div style="border:1px solid var(--borde); padding:10px; margin-bottom:10px;">
               <h3>${alumno.nombre} ${alumno.apellido}</h3>
+              <p><strong>DNI:</strong> ${alumno.dni || 'Sin DNI'}</p>
               <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
               <ul>${respuestasHtml}</ul>
             </div>
@@ -1046,23 +1133,22 @@
 
     async function inscribirmeATema() {
       const temaId = document.getElementById('temaInscripcion').value;
-      const dni = localStorage.getItem('dni');
 
       if (!temaId) {
         alert('Seleccioná un tema para inscribirte');
         return;
       }
 
-      if (!dni) {
-        alert('No se pudo identificar al alumno');
+      if (!localStorage.getItem('token')) {
+        alert('La sesión no es válida. Volvé a iniciar sesión.');
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+        const res = await fetch(`${API_BASE}/api/tema-alumno`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dni })
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ temaId })
         });
 
         const data = await res.json();
@@ -1081,8 +1167,6 @@
     async function cargarMateriasAlumno() {
       try {
         const alumnoId = localStorage.getItem('userId');
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const todosLosTemas = await res.json();
         const select = document.getElementById('temaSeleccionado');
         select.innerHTML = '';
 
@@ -1091,14 +1175,11 @@
           return;
         }
 
-        const temasInscritos = [];
-        for (const tema of todosLosTemas) {
-          const inscripcionRes = await fetch(`${API_BASE}/api/temas/${tema.id}/alumnos`);
-          const alumnos = await inscripcionRes.json();
-          if (alumnos.some(alumno => String(alumno.id) === String(alumnoId))) {
-            temasInscritos.push(tema);
-          }
-        }
+        const inscripcionRes = await fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`, {
+          headers: getAuthHeaders()
+        });
+        const temasInscritos = await inscripcionRes.json();
+        if (!inscripcionRes.ok) throw new Error(temasInscritos.error || 'No se pudieron cargar tus temas.');
 
         if (!temasInscritos.length) {
           select.innerHTML = '<option value="">No estás inscripto a ningún tema</option>';
@@ -1152,7 +1233,9 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
+        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
+          headers: getAuthHeaders()
+        });
         const preguntas = await res.json();
 
         if (!preguntas.length) {
@@ -1205,11 +1288,13 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
-        const preguntas = await res.json();
-        if (!res.ok) throw new Error(preguntas.error || 'No se pudieron consultar las preguntas.');
+        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
+          headers: getAuthHeaders()
+        });
+        const preguntasRespuesta = await res.json();
+        if (!res.ok) throw new Error(preguntasRespuesta.error || 'No se pudieron consultar las preguntas.');
 
-        preguntas = filtrarPreguntasRespondidas(preguntas, temaId);
+        const preguntas = filtrarPreguntasRespondidas(preguntasRespuesta, temaId);
         const idsActuales = preguntasActuales.map(pregunta => pregunta.id).sort().join(',');
         const idsNuevos = preguntas.map(pregunta => pregunta.id).sort().join(',');
 
@@ -1301,7 +1386,7 @@
         try {
           const res = await fetch(`${API_BASE}/api/respuestas`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({
               alumnoId: localStorage.getItem('userId'),
               preguntaId: pregunta.id,
@@ -1343,7 +1428,7 @@
           document.getElementById(`resultado-${pregunta.id}`).textContent = data.esCorrecta
             ? 'Correcto'
             : 'Incorrecto';
-          document.getElementById(`resultado-${pregunta.id}`).style.color = data.esCorrecta ? 'green' : 'crimson';
+          document.getElementById(`resultado-${pregunta.id}`).style.color = data.esCorrecta ? 'var(--exito)' : 'var(--error)';
           botonSiguiente.textContent = indiceActual < preguntasActuales.length - 1 ? 'Siguiente' : 'Finalizar';
           botonSiguiente.disabled = false;
           return;
@@ -1406,6 +1491,7 @@
       localStorage.removeItem('nombre');
       localStorage.removeItem('userId');
       localStorage.removeItem('docenteId');
+      localStorage.removeItem('token');
       localStorage.removeItem('isLoggedIn');
       window.location.href = 'index.html';
     }

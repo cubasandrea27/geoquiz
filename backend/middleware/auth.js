@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../utils/jwt');
 
 function authenticate(req, res, next) {
   const header = req.headers.authorization;
@@ -7,7 +8,10 @@ function authenticate(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Se requiere una sesión válida' });
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'geoquiz-secret-local');
+    req.user = jwt.verify(token, getJwtSecret());
+    if (!req.user.id || !['docente', 'alumno'].includes(req.user.rol)) {
+      return res.status(401).json({ error: 'El token no contiene una identidad válida' });
+    }
     next();
   } catch (error) {
     res.status(401).json({ error: 'La sesión ha expirado o es inválida' });

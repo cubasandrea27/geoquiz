@@ -17,11 +17,11 @@
 }
 
 .notificacion {
-  background: #22303b;
-  border-left: 4px solid #2364aa;
+  background: var(--superficie-2);
+  border-left: 4px solid var(--acento);
   border-radius: 4px;
   padding: 12px 14px;
-  color: #f0ece2;
+  color: var(--texto);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
   line-height: 1.4;
@@ -37,6 +37,6 @@
   transform: translateY(0);
 }
 
-.notificacion-error   { border-left-color: #c0392b; }
-.notificacion-exito   { border-left-color: #4a9d6e; }
-.notificacion-info    { border-left-color: #2364aa; }
+.notificacion-error   { border-left-color: var(--error); }
+.notificacion-exito   { border-left-color: var(--exito); }
+.notificacion-info    { border-left-color: var(--acento); }
