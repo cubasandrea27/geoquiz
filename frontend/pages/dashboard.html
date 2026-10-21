@@ -319,9 +319,9 @@
         : `${API_BASE}/api/preguntas`;
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchConToken(url, {
           method,
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             ubicacionId,
@@ -397,9 +397,9 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`, {
+        const res = await fetchConToken(`${API_BASE}/api/temas`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, descripcion })
         });
         const data = await res.json();
@@ -430,7 +430,7 @@
 
     async function cargarTemasDocente() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaEliminar');
         select.innerHTML = '';
@@ -454,7 +454,7 @@
 
     async function cargarTemasDocenteResultados() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaResultados');
         select.innerHTML = '';
@@ -478,7 +478,7 @@
 
     async function cargarTemasParaInscripcion() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaAlumno');
         select.innerHTML = '';
@@ -504,7 +504,7 @@
       const select = document.getElementById('ubicacionTema');
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         select.innerHTML = '<option value="">Seleccioná un tema</option>';
 
@@ -550,7 +550,7 @@
       const filtro = document.getElementById('preguntasTemaFiltro');
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         filtro.innerHTML = '<option value="">Seleccioná un tema</option>';
 
@@ -589,7 +589,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/preguntas/todas`);
+        const res = await fetchConToken(`${API_BASE}/api/preguntas/todas`);
         const preguntas = await res.json();
         preguntasActuales = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
 
@@ -625,9 +625,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
         const ubicaciones = await res.json();
         select.innerHTML = '<option value="">Seleccioná una ubicación</option>';
         ubicaciones.forEach(ubicacion => {
@@ -645,9 +643,8 @@
       if (!confirm('¿Querés eliminar esta pregunta?')) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/preguntas/${preguntaId}`, {
+          method: 'DELETE'
         });
         const data = await res.json();
 
@@ -671,9 +668,7 @@
       if (!temaId) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
         const ubicaciones = await res.json();
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
@@ -788,9 +783,9 @@
         const url = ubicacionEnEdicionId
           ? `${API_BASE}/api/ubicaciones/${ubicacionEnEdicionId}`
           : `${API_BASE}/api/ubicaciones`;
-        const res = await fetch(url, {
+        const res = await fetchConToken(url, {
           method: ubicacionEnEdicionId ? 'PUT' : 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             nombre,
@@ -859,9 +854,9 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones/con-pregunta`, {
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones/con-pregunta`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             ubicacionId: ubicacionId || null,
@@ -909,7 +904,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
         const ubicaciones = await res.json();
 
         if (mapaDocente && capaUbicacionesGuardadas) {
@@ -964,9 +959,8 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
+          method: 'DELETE'
         });
         const data = await res.json();
 
@@ -1001,9 +995,9 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dni })
         });
 
@@ -1034,9 +1028,8 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}`, {
+          method: 'DELETE'
         });
 
         const data = await res.json();
@@ -1064,9 +1057,7 @@
       contenedor.innerHTML = '<p>Cargando resultados...</p>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/por-tema/${temaId}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
         const respuesta = await res.json();
 
         if (!res.ok) {
@@ -1107,7 +1098,7 @@
 
     async function cargarTemasDisponiblesParaInscripcion() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
         const temas = await res.json();
         const select = document.getElementById('temaInscripcion');
         select.innerHTML = '';
@@ -1145,9 +1136,9 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/tema-alumno`, {
+        const res = await fetchConToken(`${API_BASE}/api/tema-alumno`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ temaId })
         });
 
@@ -1175,9 +1166,7 @@
           return;
         }
 
-        const inscripcionRes = await fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`, {
-          headers: getAuthHeaders()
-        });
+        const inscripcionRes = await fetchConToken(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`);
         const temasInscritos = await inscripcionRes.json();
         if (!inscripcionRes.ok) throw new Error(temasInscritos.error || 'No se pudieron cargar tus temas.');
 
@@ -1233,9 +1222,7 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/preguntas?${params}`);
         const preguntas = await res.json();
 
         if (!preguntas.length) {
@@ -1288,9 +1275,7 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/preguntas?${params}`);
         const preguntasRespuesta = await res.json();
         if (!res.ok) throw new Error(preguntasRespuesta.error || 'No se pudieron consultar las preguntas.');
 
@@ -1384,9 +1369,9 @@
 
         botonSiguiente.disabled = true;
         try {
-          const res = await fetch(`${API_BASE}/api/respuestas`, {
+          const res = await fetchConToken(`${API_BASE}/api/respuestas`, {
             method: 'POST',
-            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               alumnoId: localStorage.getItem('userId'),
               preguntaId: pregunta.id,
@@ -1485,14 +1470,7 @@
 
     function cerrarSesion() {
       detenerMonitoreoUbicacion();
-      localStorage.removeItem('rol');
-      localStorage.removeItem('dni');
-      localStorage.removeItem('email');
-      localStorage.removeItem('nombre');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('docenteId');
-      localStorage.removeItem('token');
-      localStorage.removeItem('isLoggedIn');
+      borrarSesion();
       window.location.href = 'index.html';
     }
   </script>

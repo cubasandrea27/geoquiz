@@ -26,9 +26,7 @@
       const estado = document.getElementById('estado');
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/alumno/${alumnoId}`, {
-          headers: getAuthHeaders()
-        });
+        const res = await fetchConToken(`${API_BASE}/api/respuestas/alumno/${alumnoId}`);
         const resultados = await res.json();
 
         if (!res.ok) {

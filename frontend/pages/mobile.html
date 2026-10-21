@@ -31,7 +31,7 @@
     if (!token || localStorage.getItem('rol') !== 'alumno') window.location.href = 'index.html';
     navigator.serviceWorker.register('../service-worker.js').catch(() => {});
     document.getElementById('usuario').textContent = localStorage.getItem('name') || 'Alumno';
-    document.getElementById('cerrar').addEventListener('click', () => { localStorage.clear(); window.location.href = 'index.html'; });
+    document.getElementById('cerrar').addEventListener('click', () => { borrarSesion(); window.location.href = 'index.html'; });
     document.getElementById('inscribirse').addEventListener('click', inscribirse);
     document.getElementById('resultados').addEventListener('click', () => window.location.href = 'resultados.html');
 
@@ -58,7 +58,7 @@
     cargarTemas(); cargarNotificaciones();
 
     async function cargarTemas() {
-      const response = await fetch(`${API_BASE}/api/temas`);
+      const response = await fetchConToken(`${API_BASE}/api/temas`);
       const temas = await response.json();
       const select = document.getElementById('temas');
       select.innerHTML = '<option value="">Selecciona un tema</option>' + temas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
@@ -72,9 +72,7 @@
       if (!lat || !lng) {
         return mostrarNotificacion('La ubicación GPS es necesaria.', 'info');
       }
-      const response = await fetch(`${API_BASE}/api/preguntas?temaId=${temaId}&lat=${lat}&lng=${lng}`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchConToken(`${API_BASE}/api/preguntas?temaId=${temaId}&lat=${lat}&lng=${lng}`);
       const preguntas = await response.json();
       if (!response.ok) return mostrarNotificacion(preguntas.error, 'error');
       if (!preguntas.length) return mostrarNotificacion('No hay preguntas cercanas.', 'info');
@@ -86,9 +84,9 @@
     }
 
     async function inscribirse() {
-      const response = await fetch(`${API_BASE}/api/tema-alumno`, {
+      const response = await fetchConToken(`${API_BASE}/api/tema-alumno`, {
         method:'POST',
-        headers: getAuthHeaders({'Content-Type':'application/json'}),
+        headers: { 'Content-Type':'application/json' },
         body:JSON.stringify({temaId})
       });
       const data = await response.json();
@@ -98,9 +96,9 @@
     async function enviarRespuesta() {
       const opcion = document.querySelector('input[name="opcion"]:checked');
       if (!opcion) return mostrarNotificacion('Selecciona una respuesta.', 'error');
-      const response = await fetch(`${API_BASE}/api/respuestas`, {
+      const response = await fetchConToken(`${API_BASE}/api/respuestas`, {
         method:'POST',
-        headers: getAuthHeaders({'Content-Type':'application/json'}),
+        headers: { 'Content-Type':'application/json' },
         body:JSON.stringify({preguntaId:pregunta.id, opcionId:Number(opcion.value), latitud:Number(localStorage.getItem('gpsLat')||0), longitud:Number(localStorage.getItem('gpsLng')||0), precision:50})
       });
       const data = await response.json();
@@ -109,7 +107,7 @@
     }
 
     async function cargarNotificaciones() {
-      const response = await fetch(`${API_BASE}/api/notificaciones?userType=alumno&userId=${alumnoId}`, {headers:getAuthHeaders()});
+      const response = await fetchConToken(`${API_BASE}/api/notificaciones?userType=alumno&userId=${alumnoId}`);
       const notifications = await response.json();
       document.getElementById('notificaciones').innerHTML = notifications.length ? notifications.map(n => `<article style="padding:12px;background:var(--superficie-2);border-radius:7px;margin-bottom:8px"><strong>${n.titulo}</strong><p>${n.mensaje}</p></article>`).join('') : '<p>No hay notificaciones.</p>';
     }

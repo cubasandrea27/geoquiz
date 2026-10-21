@@ -58,6 +58,13 @@ function cambiarRol(btn, rol) {
 document.addEventListener('DOMContentLoaded', () => {
   redirectIfLoggedIn();
 
+  // Mensaje que deja el dashboard cuando la sesión venció
+  const mensajeLogin = sessionStorage.getItem('mensajeLogin');
+  if (mensajeLogin) {
+    sessionStorage.removeItem('mensajeLogin');
+    mostrarNotificacion(mensajeLogin, 'info', 6000);
+  }
+
   const btnIngresar = document.getElementById('btnIngresar');
 
   if (!btnIngresar) return;
