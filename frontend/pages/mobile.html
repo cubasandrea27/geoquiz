@@ -10,14 +10,20 @@
   <title>GeoQuiz Móvil</title>
 </head>
 <body style="padding:16px; min-height:100vh;">
-  <main style="width:100%; max-width:520px; margin:0 auto;">
-    <header style="color:white; margin-bottom:20px;"><h1>GeoQuiz</h1><p id="usuario">Cargando...</p></header>
+  <!-- Usa los mismos estilos que el panel del alumno del dashboard (#panel-alumno) -->
+  <main id="panel-alumno" style="max-width:520px; margin:0 auto;">
+    <header style="margin-bottom:20px;"><h1>GeoQuiz</h1><p id="usuario">Cargando...</p></header>
     <section id="notificaciones" style="margin-bottom:18px;"></section>
-    <select id="temas" aria-label="Temas"><option>Cargando...</option></select>
+    <div class="campo">
+      <label for="temas">Tema / materia</label>
+      <select id="temas"><option>Cargando...</option></select>
+    </div>
     <button class="ingresar" id="inscribirse">Inscribirme</button>
     <p id="estadoGps" aria-live="polite" style="margin-top:12px;"></p>
-    <button class="ingresar" id="reintentarGps" style="display:none;">Reintentar ubicación</button>
-    <section id="quiz" style="margin-top:20px; display:none;"></section>
+    <button class="ingresar" id="reintentarGps" style="display:none; margin-top:8px;">Reintentar ubicación</button>
+    <div id="preguntasAlumno" style="margin-top:20px;">
+      <div id="quiz" style="display:none;"></div>
+    </div>
     <button class="ingresar" id="resultados" style="margin-top:16px;">Ver resultados</button>
     <button class="ingresar" id="instalar" style="margin-top:10px; display:none;">Instalar GeoQuiz</button>
     <button class="ingresar" id="cerrar" style="margin-top:10px; background:transparent; color:var(--texto); border:1px solid var(--borde-fuerte);">Cerrar sesión</button>
@@ -119,7 +125,7 @@
       if (!preguntas.length) return mostrarNotificacion('No hay preguntas cercanas.', 'info');
       pregunta = preguntas[0];
       document.getElementById('quiz').style.display = 'block';
-      document.getElementById('quiz').innerHTML = `<h2>${escaparHtml(pregunta.enunciado)}</h2>${pregunta.opciones.map(o => `<label><input type="radio" name="opcion" value="${o.id}"> ${escaparHtml(o.texto)}</label><br>`).join('')}<button class="ingresar" id="enviar">Responder</button>`;
+      document.getElementById('quiz').innerHTML = `<h2>${escaparHtml(pregunta.enunciado)}</h2>${pregunta.opciones.map(o => `<label><input type="radio" name="opcion" value="${o.id}"> ${escaparHtml(o.texto)}</label>`).join('')}<button class="ingresar" id="enviar">Responder</button>`;
       document.getElementById('enviar').addEventListener('click', enviarRespuesta);
     }
 
