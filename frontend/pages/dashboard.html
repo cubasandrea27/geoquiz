@@ -776,8 +776,8 @@
 
         contenedor.innerHTML = preguntasActuales.map(pregunta => `
           <article style="border:1px solid var(--borde); padding:12px; margin-bottom:10px;">
-            <p><strong>${pregunta.enunciado}</strong></p>
-            <p>Opciones: ${pregunta.opcion1}, ${pregunta.opcion2}, ${pregunta.opcion3}</p>
+            <p><strong>${escaparHtml(pregunta.enunciado)}</strong></p>
+            <p>Opciones: ${escaparHtml(pregunta.opcion1)}, ${escaparHtml(pregunta.opcion2)}, ${escaparHtml(pregunta.opcion3)}</p>
             <p>Respuesta correcta: Opción ${pregunta.correcta}</p>
             <p>Ubicación: ${pregunta.ubicacionId || 'Sin ubicación'}</p>
             <button type="button" onclick="editarPreguntaDocente(${pregunta.id})">Editar</button>
@@ -807,7 +807,7 @@
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
           option.value = ubicacion.id;
-          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.radio_metros} m)`;
+          option.textContent = `${escaparHtml(ubicacion.nombre || 'Sin nombre')} (${ubicacion.radio_metros} m)`;
           select.appendChild(option);
         });
       } catch (error) {
@@ -849,7 +849,7 @@
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
           option.value = ubicacion.id;
-          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.latitud}, ${ubicacion.longitud})`;
+          option.textContent = `${escaparHtml(ubicacion.nombre || 'Sin nombre')} (${ubicacion.latitud}, ${ubicacion.longitud})`;
           option.dataset.nombre = ubicacion.nombre || '';
           option.dataset.latitud = ubicacion.latitud;
           option.dataset.longitud = ubicacion.longitud;
@@ -1088,7 +1088,7 @@
             const marcador = L.marker([ubicacion.latitud, ubicacion.longitud]).addTo(capaUbicacionesGuardadas);
             const popup = document.createElement('div');
             popup.innerHTML = `
-              <strong>${ubicacion.nombre || 'Sin nombre'}</strong><br>
+              <strong>${escaparHtml(ubicacion.nombre || 'Sin nombre')}</strong><br>
               ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)<br>
               <button type="button" class="ingresar" style="margin-top:6px;">Eliminar ubicación</button>
             `;
@@ -1100,7 +1100,7 @@
         contenedor.innerHTML = ubicaciones.length
           ? '<strong>Ubicaciones guardadas:</strong><ul>' + ubicaciones.map(ubicacion => `
               <li>
-                ${ubicacion.nombre || 'Sin nombre'}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)
+                ${escaparHtml(ubicacion.nombre || 'Sin nombre')}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)
                 <button type="button" onclick="eliminarUbicacionDocente(${ubicacion.id})" style="margin-left:8px;">Eliminar</button>
               </li>
             `).join('') + '</ul>'
@@ -1494,7 +1494,7 @@
           finalizarCuestionario();
         }
       } catch (error) {
-        contenedor.innerHTML = `<p>${error.message || 'No se pudieron cargar las preguntas.'}</p>`;
+        contenedor.innerHTML = `<p>${escaparHtml(error.message || 'No se pudieron cargar las preguntas.')}</p>`;
       }
     }
 
@@ -1585,8 +1585,8 @@
       const card = document.createElement('div');
       card.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Puntaje: ${puntaje}</div>
-        <h3>${indiceActual + 1}. ${pregunta.enunciado}</h3>
-        ${pregunta.opciones.map(opcion => `<label><input type="radio" name="pregunta-${pregunta.id}" value="${opcion.id}"> ${opcion.texto}</label><br>`).join('')}
+        <h3>${indiceActual + 1}. ${escaparHtml(pregunta.enunciado)}</h3>
+        ${pregunta.opciones.map(opcion => `<label><input type="radio" name="pregunta-${pregunta.id}" value="${opcion.id}"> ${escaparHtml(opcion.texto)}</label><br>`).join('')}
         <p id="resultado-${pregunta.id}" style="margin-top:8px; font-weight:bold;"></p>
         <button id="btnSiguiente" type="button" style="margin-top:10px;" disabled>Siguiente</button>
       `;
@@ -1690,7 +1690,7 @@
         .filter(resumen => resumen.respondidas > 0)
         .map(resumen => `
           <tr>
-            <td>${resumen.nombre}</td>
+            <td>${escaparHtml(resumen.nombre)}</td>
             <td>${resumen.correctas}</td>
             <td>${resumen.incorrectas}</td>
             <td>${resumen.respondidas}</td>
@@ -1699,7 +1699,7 @@
 
       contenedor.innerHTML = `
         <h2>Resumen de respuestas</h2>
-        <p>Terminaste las preguntas disponibles de <strong>${resumenActual?.nombre || 'este tema'}</strong>.</p>
+        <p>Terminaste las preguntas disponibles de <strong>${escaparHtml(resumenActual?.nombre || 'este tema')}</strong>.</p>
         <p>Puntaje del tema: <strong>${puntaje}</strong></p>
         <table style="width:100%; border-collapse:collapse; margin-top:16px;">
           <thead>

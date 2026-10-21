@@ -42,14 +42,14 @@
 
         estado.innerHTML = resultados.map(tema => `
           <section style="margin:20px 0; padding:16px; border:1px solid var(--borde);">
-            <h2>${tema.tema_nombre}</h2>
+            <h2>${escaparHtml(tema.tema_nombre)}</h2>
             <p><strong>Puntaje:</strong> ${tema.correctas} de ${tema.correctas + tema.incorrectas}</p>
             <p><strong>Correctas:</strong> ${tema.correctas} | <strong>Incorrectas:</strong> ${tema.incorrectas}</p>
             <ul>
               ${tema.respuestas.map(respuesta => `
                 <li style="margin:8px 0;">
-                  ${respuesta.pregunta}<br>
-                  <strong>Respuesta:</strong> ${respuesta.opcion_elegida}
+                  ${escaparHtml(respuesta.pregunta)}<br>
+                  <strong>Respuesta:</strong> ${escaparHtml(respuesta.opcion_elegida)}
                   <span style="color:${respuesta.resultado === 'Correcto' ? 'var(--exito)' : 'var(--error)'};">(${respuesta.resultado})</span>
                 </li>
               `).join('')}
@@ -57,7 +57,7 @@
           </section>
         `).join('');
       } catch (error) {
-        estado.innerHTML = `<p>${error.message}</p>`;
+        estado.innerHTML = `<p>${escaparHtml(error.message)}</p>`;
       }
     }
 

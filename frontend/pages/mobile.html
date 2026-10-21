@@ -69,7 +69,7 @@
       const response = await fetchConToken(`${API_BASE}/api/temas`);
       const temas = await leerJson(response);
       const select = document.getElementById('temas');
-      select.innerHTML = '<option value="">Selecciona un tema</option>' + temas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+      select.innerHTML = '<option value="">Selecciona un tema</option>' + temas.map(t => `<option value="${t.id}">${escaparHtml(t.nombre)}</option>`).join('');
       select.onchange = () => { temaId = select.value; cargarQuiz(); };
     }
 
@@ -119,7 +119,7 @@
       if (!preguntas.length) return mostrarNotificacion('No hay preguntas cercanas.', 'info');
       pregunta = preguntas[0];
       document.getElementById('quiz').style.display = 'block';
-      document.getElementById('quiz').innerHTML = `<h2>${pregunta.enunciado}</h2>${pregunta.opciones.map(o => `<label><input type="radio" name="opcion" value="${o.id}"> ${o.texto}</label><br>`).join('')}<button class="ingresar" id="enviar">Responder</button>`;
+      document.getElementById('quiz').innerHTML = `<h2>${escaparHtml(pregunta.enunciado)}</h2>${pregunta.opciones.map(o => `<label><input type="radio" name="opcion" value="${o.id}"> ${escaparHtml(o.texto)}</label><br>`).join('')}<button class="ingresar" id="enviar">Responder</button>`;
       document.getElementById('enviar').addEventListener('click', enviarRespuesta);
     }
 
@@ -152,7 +152,7 @@
     async function cargarNotificaciones() {
       const response = await fetchConToken(`${API_BASE}/api/notificaciones?userType=alumno&userId=${alumnoId}`);
       const notifications = await leerJson(response);
-      document.getElementById('notificaciones').innerHTML = notifications.length ? notifications.map(n => `<article style="padding:12px;background:var(--superficie-2);border-radius:7px;margin-bottom:8px"><strong>${n.titulo}</strong><p>${n.mensaje}</p></article>`).join('') : '<p>No hay notificaciones.</p>';
+      document.getElementById('notificaciones').innerHTML = notifications.length ? notifications.map(n => `<article style="padding:12px;background:var(--superficie-2);border-radius:7px;margin-bottom:8px"><strong>${escaparHtml(n.titulo)}</strong><p>${escaparHtml(n.mensaje)}</p></article>`).join('') : '<p>No hay notificaciones.</p>';
     }
   </script>
 </body>
