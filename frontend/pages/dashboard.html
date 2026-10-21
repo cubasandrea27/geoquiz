@@ -163,6 +163,23 @@
         </div>
         <button class="ingresar" id="btnRegistrarAlumnoTema" type="button">Registrar alumno al tema</button>
 
+        <h3>Importar alumnos desde CSV</h3>
+        <p>El archivo tiene que tener las columnas <strong>nombre, apellido, dni y password</strong> (mínimo 8 caracteres).
+          Si lo tenés en Excel: Archivo → Guardar como → CSV.</p>
+        <div class="campo">
+          <label for="archivoAlumnosCsv">Archivo CSV</label>
+          <input type="file" id="archivoAlumnosCsv" accept=".csv,text/csv">
+        </div>
+        <div class="campo">
+          <label for="temaImportacion">Inscribirlos también en un tema (opcional)</label>
+          <select id="temaImportacion">
+            <option value="">No inscribir</option>
+          </select>
+        </div>
+        <div id="vistaPreviaCsv"></div>
+        <button class="ingresar" id="btnImportarAlumnos" type="button" disabled>Importar alumnos</button>
+        <div id="resultadoImportacion" aria-live="polite" style="margin-top:12px;"></div>
+
         <h3>Ver resultados</h3>
         <div class="campo">
           <label for="temaResultados">Tema</label>
@@ -278,6 +295,8 @@
       document.getElementById('btnCrearTema').addEventListener('click', crearTemaDocente);
       document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
       document.getElementById('btnCancelarEdicionPregunta').addEventListener('click', cancelarEdicionPregunta);
+      document.getElementById('archivoAlumnosCsv').addEventListener('change', leerArchivoCsv);
+      document.getElementById('btnImportarAlumnos').addEventListener('click', importarAlumnosCsv);
       cargarTemasDocente();
       cargarTemasDocenteResultados();
       cargarTemasParaInscripcion();
@@ -504,9 +523,157 @@
           option.textContent = tema.nombre;
           select.appendChild(option);
         });
+
+        // Los mismos temas para inscribir a los alumnos importados por CSV
+        const selectImportacion = document.getElementById('temaImportacion');
+        selectImportacion.innerHTML = select.innerHTML;
+        selectImportacion.options[0].textContent = 'No inscribir';
       } catch (error) {
         document.getElementById('temaAlumno').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
       }
+    }
+
+    // ---- Importación de alumnos desde CSV ----
+    let csvAlumnos = '';
+
+    // Excel en español guarda los CSV separados por punto y coma,
+    // pero el servidor espera comas. Si viene con ";" se cambia por ",".
+    function prepararCsv(texto) {
+      const primeraLinea = texto.split(/\r?\n/)[0];
+      if (primeraLinea.includes(';') && !primeraLinea.includes(',')) {
+        return texto.replace(/;/g, ',');
+      }
+      return texto;
+    }
+
+    async function leerArchivoCsv() {
+      const archivo = document.getElementById('archivoAlumnosCsv').files[0];
+      const vista = document.getElementById('vistaPreviaCsv');
+      const boton = document.getElementById('btnImportarAlumnos');
+      csvAlumnos = '';
+      boton.disabled = true;
+      vista.innerHTML = '';
+      document.getElementById('resultadoImportacion').innerHTML = '';
+
+      if (!archivo) return;
+
+      if (!archivo.name.toLowerCase().endsWith('.csv')) {
+        mostrarNotificacion('El archivo tiene que ser .csv. En Excel: Archivo → Guardar como → CSV.', 'error', 6000);
+        return;
+      }
+      if (archivo.size > 2 * 1024 * 1024) {
+        mostrarNotificacion('El archivo no puede pesar más de 2 MB.', 'error');
+        return;
+      }
+
+      const texto = prepararCsv(await archivo.text());
+      const lineas = texto.split(/\r?\n/).filter(linea => linea.trim());
+      const encabezados = (lineas[0] || '').replace(/^﻿/, '').split(',')
+        .map(columna => columna.replace(/"/g, '').trim().toLowerCase());
+      const faltan = ['nombre', 'apellido', 'dni'].filter(columna => !encabezados.includes(columna));
+      const columnaPassword = encabezados.findIndex(columna => ['password', 'contrasena', 'contraseña', 'clave'].includes(columna));
+      if (columnaPassword === -1) faltan.push('password');
+
+      if (faltan.length) {
+        vista.innerHTML = `<p style="color:#D9756A;">Al archivo le faltan las columnas: ${escaparHtml(faltan.join(', '))}</p>`;
+        return;
+      }
+      if (lineas.length < 2) {
+        vista.innerHTML = '<p>El archivo no tiene alumnos cargados.</p>';
+        return;
+      }
+
+      // Vista previa de las primeras 5 filas (sin mostrar las contraseñas)
+      const filas = lineas.slice(1, 6).map(linea => {
+        const valores = linea.split(',').map(valor => valor.replace(/"/g, '').trim());
+        return '<tr>' + encabezados.map((columna, i) =>
+          `<td>${i === columnaPassword ? '••••••••' : escaparHtml(valores[i])}</td>`
+        ).join('') + '</tr>';
+      }).join('');
+      const restantes = lineas.length - 1 - 5;
+
+      vista.innerHTML = `
+        <p><strong>${lineas.length - 1}</strong> alumnos en el archivo. Vista previa:</p>
+        <div class="tabla-scroll">
+          <table class="tabla-datos">
+            <thead><tr>${encabezados.map(columna => `<th>${escaparHtml(columna)}</th>`).join('')}</tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+        ${restantes > 0 ? `<p>... y ${restantes} más.</p>` : ''}
+      `;
+      csvAlumnos = texto;
+      boton.disabled = false;
+    }
+
+    async function importarAlumnosCsv() {
+      const boton = document.getElementById('btnImportarAlumnos');
+      const resultado = document.getElementById('resultadoImportacion');
+      const temaId = document.getElementById('temaImportacion').value;
+      if (!csvAlumnos) return;
+
+      boton.disabled = true;
+      resultado.innerHTML = '<p>Importando alumnos...</p>';
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/alumnos/importar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv' },
+          body: csvAlumnos
+        });
+        const data = await leerJson(res);
+
+        if (!res.ok) {
+          resultado.innerHTML = '';
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo importar el archivo.'), 'error');
+          boton.disabled = false;
+          return;
+        }
+
+        let html = `<p><strong>Importados:</strong> ${data.importados} de ${data.total}. <strong>Omitidos:</strong> ${data.omitidos}.</p>`;
+        if (data.errores && data.errores.length) {
+          html += '<p>Filas con problemas:</p><ul>' + data.errores.map(error =>
+            `<li>Fila ${error.linea} (DNI ${escaparHtml(error.dni || 'vacío')}): ${escaparHtml(error.error)}</li>`
+          ).join('') + '</ul>';
+        }
+
+        // Inscribir en el tema elegido a todos los DNI del archivo
+        // (los nuevos y los que ya existían).
+        if (temaId) {
+          const dnis = obtenerDnisDelCsv(csvAlumnos);
+          let inscriptos = 0;
+          for (const dni of dnis) {
+            const resInscripcion = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dni })
+            });
+            if (resInscripcion.ok) inscriptos++;
+          }
+          const nombreTema = document.getElementById('temaImportacion').selectedOptions[0].textContent;
+          html += `<p><strong>Inscriptos en ${escaparHtml(nombreTema)}:</strong> ${inscriptos} de ${dnis.length}.</p>`;
+        }
+
+        resultado.innerHTML = html;
+        mostrarNotificacion('Importación finalizada.', 'exito');
+        document.getElementById('archivoAlumnosCsv').value = '';
+        document.getElementById('vistaPreviaCsv').innerHTML = '';
+        csvAlumnos = '';
+      } catch (error) {
+        resultado.innerHTML = '';
+        mostrarNotificacion(error.message || 'No se pudo conectar con el servidor.', 'error');
+        boton.disabled = false;
+      }
+    }
+
+    function obtenerDnisDelCsv(texto) {
+      const lineas = texto.split(/\r?\n/).filter(linea => linea.trim());
+      const encabezados = lineas[0].replace(/^﻿/, '').split(',').map(columna => columna.replace(/"/g, '').trim().toLowerCase());
+      const columnaDni = encabezados.indexOf('dni');
+      const dnis = lineas.slice(1)
+        .map(linea => (linea.split(',')[columnaDni] || '').replace(/"/g, '').trim())
+        .filter(dni => /^\d{7,8}$/.test(dni));
+      return [...new Set(dnis)];
     }
 
     async function cargarTemasParaUbicacion() {

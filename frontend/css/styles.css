@@ -934,3 +934,24 @@ body:not(:has(.contenedor)) > #btnCerrarSesion:hover {
     padding: 16px 12px;
   }
 }
+
+/* Tablas de datos (vista previa del CSV, reportes).
+   En pantallas chicas la tabla se desplaza de costado sin romper la página. */
+.tabla-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.tabla-datos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla-datos th,
+.tabla-datos td {
+  border-bottom: 1px solid var(--borde);
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+}

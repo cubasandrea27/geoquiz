@@ -47,6 +47,17 @@ async function leerJson(res) {
   }
 }
 
+// Escapa los caracteres especiales antes de meter un texto en innerHTML,
+// así un nombre o enunciado con "<script>" se muestra como texto y no se ejecuta.
+function escaparHtml(texto) {
+  return String(texto ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Arma un mensaje claro para el usuario según el error que devolvió el servidor.
 function mensajeDeError(res, data, mensajePorDefecto) {
   if (data && data.error) return data.error;
