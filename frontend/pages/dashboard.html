@@ -192,6 +192,7 @@
           <input type="text" id="filtroAlumnoDniResultados" placeholder="Ingresá el DNI o parte del DNI" maxlength="8" inputmode="numeric">
         </div>
         <button class="ingresar" id="btnVerResultados" type="button">Ver resultados</button>
+        <button class="ingresar" id="btnExportarCsv" type="button" style="margin-top:8px;">Descargar resultados en CSV</button>
         <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
       </div>
     </section>
@@ -289,6 +290,7 @@
       document.getElementById('panel-docente').style.display = 'block';
       document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
       document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
+      document.getElementById('btnExportarCsv').addEventListener('click', exportarResultadosCsv);
       document.getElementById('btnRegistrarAlumnoTema').addEventListener('click', registrarAlumnoATema);
       document.getElementById('btnGuardarUbicacion').addEventListener('click', guardarUbicacionYPreguntaDocente);
       document.getElementById('btnUsarUbicacionActual').addEventListener('click', usarUbicacionActualDocente);
@@ -1231,44 +1233,121 @@
       contenedor.innerHTML = '<p>Cargando resultados...</p>';
 
       try {
-        const res = await fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
-        const respuesta = await leerJson(res);
+        // resumen: porcentaje por alumno (incluye inscriptos sin respuestas)
+        // detalle: cada respuesta de cada alumno
+        // inscriptos: para tener el DNI de cada alumno y poder filtrar
+        const [resResumen, resDetalle, resInscriptos] = await Promise.all([
+          fetchConToken(`${API_BASE}/api/reportes/resumen/${temaId}`),
+          fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`),
+          fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`)
+        ]);
+        const resumen = await leerJson(resResumen);
+        const detalle = await leerJson(resDetalle);
+        const inscriptos = await leerJson(resInscriptos);
 
-        if (!res.ok) {
-          contenedor.innerHTML = `<p>${mensajeDeError(res, respuesta, 'No se pudieron cargar los resultados.')}</p>`;
+        if (!resResumen.ok) {
+          contenedor.innerHTML = `<p>${escaparHtml(mensajeDeError(resResumen, resumen, 'No se pudieron cargar los resultados.'))}</p>`;
           return;
         }
+
+        const dniPorAlumno = {};
+        (Array.isArray(inscriptos) ? inscriptos : []).forEach(alumno => { dniPorAlumno[alumno.id] = alumno.dni; });
+        const respuestasPorAlumno = {};
+        (Array.isArray(detalle) ? detalle : []).forEach(alumno => { respuestasPorAlumno[alumno.alumno_id] = alumno.respuestas; });
 
         const filtroDni = document.getElementById('filtroAlumnoDniResultados').value.trim();
-        const resultados = Array.isArray(respuesta)
-          ? respuesta.filter(alumno => !filtroDni || String(alumno.dni || '').includes(filtroDni))
-          : [];
+        const alumnos = resumen.alumnos.filter(alumno => !filtroDni || String(dniPorAlumno[alumno.alumno_id] || '').includes(filtroDni));
 
-        if (!resultados.length) {
-          contenedor.innerHTML = filtroDni
-            ? '<p>No hay resultados para el DNI ingresado.</p>'
-            : '<p>No hay respuestas registradas para este tema aún.</p>';
+        if (!resumen.alumnos.length) {
+          contenedor.innerHTML = '<p>Este tema todavía no tiene alumnos inscriptos.</p>';
+          return;
+        }
+        if (!alumnos.length) {
+          contenedor.innerHTML = '<p>No hay alumnos con ese DNI en este tema.</p>';
           return;
         }
 
-        contenedor.innerHTML = resultados.map(alumno => {
-          const respuestasHtml = alumno.respuestas.map(resp => `
-            <li>${resp.pregunta}: <strong>${resp.resultado}</strong> (${resp.opcion_elegida})</li>
+        // Totales del tema
+        const totalRespuestas = resumen.alumnos.reduce((suma, alumno) => suma + Number(alumno.respuestas), 0);
+        const totalCorrectas = resumen.alumnos.reduce((suma, alumno) => suma + Number(alumno.correctas), 0);
+        const conRespuestas = resumen.alumnos.filter(alumno => Number(alumno.respuestas) > 0).length;
+        const promedio = totalRespuestas ? Math.round((totalCorrectas / totalRespuestas) * 100) : 0;
+
+        const resumenHtml = `
+          <div class="resumen-tema">
+            <div><span class="dato">${resumen.alumnos.length}</span><span>inscriptos</span></div>
+            <div><span class="dato">${conRespuestas}</span><span>respondieron</span></div>
+            <div><span class="dato">${totalRespuestas}</span><span>respuestas</span></div>
+            <div><span class="dato">${promedio}%</span><span>aciertos</span></div>
+          </div>
+        `;
+
+        const alumnosHtml = alumnos.map(alumno => {
+          const respondidas = Number(alumno.respuestas);
+          const porcentaje = respondidas ? Number(alumno.porcentaje) : 0;
+          const respuestas = respuestasPorAlumno[alumno.alumno_id] || [];
+          const respuestasHtml = respuestas.map(resp => `
+            <li>${escaparHtml(resp.pregunta)}: <strong style="color:${resp.resultado === 'correcta' ? '#6FA287' : '#D9756A'};">${escaparHtml(resp.resultado)}</strong> (${escaparHtml(resp.opcion_elegida)})</li>
           `).join('');
 
           return `
-            <div style="border:1px solid var(--borde); padding:10px; margin-bottom:10px;">
-              <h3>${alumno.nombre} ${alumno.apellido}</h3>
-              <p><strong>DNI:</strong> ${alumno.dni || 'Sin DNI'}</p>
-              <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
-              <ul>${respuestasHtml}</ul>
+            <div class="tarjeta-resultado">
+              <h3>${escaparHtml(alumno.nombre)} ${escaparHtml(alumno.apellido)}</h3>
+              <p><strong>DNI:</strong> ${escaparHtml(dniPorAlumno[alumno.alumno_id] || 'Sin DNI')}</p>
+              ${respondidas
+                ? `<div class="barra-aciertos" role="img" aria-label="${porcentaje}% de respuestas correctas">
+                     <span style="width:${porcentaje}%;"></span>
+                   </div>
+                   <p class="dato">${alumno.correctas} de ${respondidas} correctas (${porcentaje}%)</p>
+                   <details>
+                     <summary>Ver respuestas</summary>
+                     <ul>${respuestasHtml}</ul>
+                   </details>`
+                : '<p>Todavía no respondió preguntas.</p>'}
             </div>
           `;
         }).join('');
+
+        contenedor.innerHTML = resumenHtml + alumnosHtml;
       } catch (error) {
-        contenedor.innerHTML = '<p>No se pudieron cargar los resultados.</p>';
+        contenedor.innerHTML = `<p>${escaparHtml(error.message || 'No se pudieron cargar los resultados.')}</p>`;
       }
     }
+
+    // Descarga el CSV de respuestas del tema. Se usa fetch (y no un link común)
+    // porque la ruta necesita el token en el encabezado.
+    async function exportarResultadosCsv() {
+      const select = document.getElementById('temaResultados');
+      const temaId = select.value;
+
+      if (!temaId) {
+        mostrarNotificacion('Seleccioná un tema para descargar el CSV.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/reportes/csv/${temaId}`);
+        if (!res.ok) {
+          const data = await leerJson(res);
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo descargar el CSV.'), 'error');
+          return;
+        }
+
+        const archivo = await res.blob();
+        const nombreTema = select.selectedOptions[0].textContent.replace(/[^a-z0-9_-]/gi, '_');
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(archivo);
+        enlace.download = `resultados_${nombreTema}.csv`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        URL.revokeObjectURL(enlace.href);
+        mostrarNotificacion('CSV descargado.', 'exito');
+      } catch (error) {
+        mostrarNotificacion(error.message || 'No se pudo conectar con el servidor.', 'error');
+      }
+    }
+
 
     async function cargarTemasDisponiblesParaInscripcion() {
       try {
