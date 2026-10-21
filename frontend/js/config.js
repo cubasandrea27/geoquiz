@@ -36,3 +36,23 @@ async function fetchConToken(url, opciones = {}) {
 
   return res;
 }
+
+// Lee el JSON de la respuesta. Si el servidor no devolvió JSON (por ejemplo,
+// una página de error), devuelve un objeto vacío en vez de romper.
+async function leerJson(res) {
+  try {
+    return await res.json();
+  } catch (error) {
+    return {};
+  }
+}
+
+// Arma un mensaje claro para el usuario según el error que devolvió el servidor.
+function mensajeDeError(res, data, mensajePorDefecto) {
+  if (data && data.error) return data.error;
+  if (res.status === 400) return 'Revisá los datos ingresados.';
+  if (res.status === 403) return 'No tenés permiso para hacer esto.';
+  if (res.status === 404) return 'No se encontró lo que buscabas.';
+  if (res.status >= 500) return 'El servidor tuvo un problema. Probá de nuevo en un rato.';
+  return mensajePorDefecto;
+}

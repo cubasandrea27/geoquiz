@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mis resultados - GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
 </head>
 <body>
   <main style="max-width:900px; margin:0 auto; padding:24px;">
@@ -15,6 +16,7 @@
   </main>
 
   <script src="../js/config.js"></script>
+  <script src="../js/notificaciones.js"></script>
   <script>
     const alumnoId = localStorage.getItem('userId');
 
@@ -27,10 +29,10 @@
 
       try {
         const res = await fetchConToken(`${API_BASE}/api/respuestas/alumno/${alumnoId}`);
-        const resultados = await res.json();
+        const resultados = await leerJson(res);
 
         if (!res.ok) {
-          throw new Error(resultados.error || 'No se pudieron cargar los resultados.');
+          throw new Error(mensajeDeError(res, resultados, 'No se pudieron cargar los resultados.'));
         }
 
         if (!resultados.length) {

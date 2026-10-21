@@ -59,7 +59,7 @@
 
     async function cargarTemas() {
       const response = await fetchConToken(`${API_BASE}/api/temas`);
-      const temas = await response.json();
+      const temas = await leerJson(response);
       const select = document.getElementById('temas');
       select.innerHTML = '<option value="">Selecciona un tema</option>' + temas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
       select.onchange = () => { temaId = select.value; cargarQuiz(); };
@@ -73,8 +73,8 @@
         return mostrarNotificacion('La ubicación GPS es necesaria.', 'info');
       }
       const response = await fetchConToken(`${API_BASE}/api/preguntas?temaId=${temaId}&lat=${lat}&lng=${lng}`);
-      const preguntas = await response.json();
-      if (!response.ok) return mostrarNotificacion(preguntas.error, 'error');
+      const preguntas = await leerJson(response);
+      if (!response.ok) return mostrarNotificacion(mensajeDeError(response, preguntas, 'No se pudieron cargar las preguntas.'), 'error');
       if (!preguntas.length) return mostrarNotificacion('No hay preguntas cercanas.', 'info');
       pregunta = preguntas[0];
       document.getElementById('quiz').style.display = 'block';
@@ -89,8 +89,9 @@
         headers: { 'Content-Type':'application/json' },
         body:JSON.stringify({temaId})
       });
-      const data = await response.json();
-      mostrarNotificacion(data.message, response.ok ? 'exito' : 'error');
+      const data = await leerJson(response);
+      if (!response.ok) return mostrarNotificacion(mensajeDeError(response, data, 'No se pudo completar la operación.'), 'error');
+      mostrarNotificacion(data.message, 'exito');
     }
 
     async function enviarRespuesta() {
@@ -101,14 +102,15 @@
         headers: { 'Content-Type':'application/json' },
         body:JSON.stringify({preguntaId:pregunta.id, opcionId:Number(opcion.value), latitud:Number(localStorage.getItem('gpsLat')||0), longitud:Number(localStorage.getItem('gpsLng')||0), precision:50})
       });
-      const data = await response.json();
-      mostrarNotificacion(data.message, response.ok ? 'exito' : 'error');
+      const data = await leerJson(response);
+      if (!response.ok) return mostrarNotificacion(mensajeDeError(response, data, 'No se pudo completar la operación.'), 'error');
+      mostrarNotificacion(data.message, 'exito');
       if (response.ok) document.getElementById('quiz').style.display = 'none';
     }
 
     async function cargarNotificaciones() {
       const response = await fetchConToken(`${API_BASE}/api/notificaciones?userType=alumno&userId=${alumnoId}`);
-      const notifications = await response.json();
+      const notifications = await leerJson(response);
       document.getElementById('notificaciones').innerHTML = notifications.length ? notifications.map(n => `<article style="padding:12px;background:var(--superficie-2);border-radius:7px;margin-bottom:8px"><strong>${n.titulo}</strong><p>${n.mensaje}</p></article>`).join('') : '<p>No hay notificaciones.</p>';
     }
   </script>
