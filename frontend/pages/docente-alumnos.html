@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>GeoQuiz - Alumnos</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <main class="wizard-pagina">
+    <header class="wizard-cabecera">
+      <div>
+        <p class="wizard-marca">GeoQuiz</p>
+        <h1>Registrar alumnos</h1>
+        <p id="temaDescripcion">Agregá los alumnos que participarán del tema.</p>
+      </div>
+      <button class="boton-secundario" id="btnCerrarSesion" type="button">Cerrar sesión</button>
+    </header>
+
+    <nav class="wizard-pasos" aria-label="Pasos del docente">
+      <span class="paso completado">1. Tema y preguntas</span>
+      <span class="paso completado">2. Ubicaciones</span>
+      <span class="paso activo">3. Alumnos</span>
+      <span class="paso">4. Resultados</span>
+    </nav>
+
+    <section class="wizard-tarjeta">
+      <h2>Alumnos inscriptos</h2>
+      <p class="wizard-ayuda">Ingresá el DNI de cada alumno y presioná registrar.</p>
+
+      <div class="campo wizard-campo">
+        <label for="alumnoDni">DNI del alumno</label>
+        <input id="alumnoDni" type="text" maxlength="8" inputmode="numeric" placeholder="Ej: 40123456">
+      </div>
+      <button class="ingresar" id="btnRegistrarAlumno" type="button">Registrar alumno</button>
+      <p id="mensajeAlumno" class="wizard-mensaje" role="status"></p>
+      <div id="alumnosRegistrados" class="wizard-lista"></div>
+
+      <div class="wizard-acciones">
+        <a class="boton-secundario" href="docente-ubicaciones.html">Volver a ubicaciones</a>
+        <button class="ingresar" id="btnSiguienteResultados" type="button">Siguiente: ver resultados</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script>
+    if (localStorage.getItem('rol') !== 'docente' || localStorage.getItem('isLoggedIn') !== 'true' || !localStorage.getItem('token')) {
+      window.location.href = 'index.html';
+      throw new Error('No autenticado');
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const temaId = Number(params.get('temaId') || localStorage.getItem('geoquiz.wizard.temaId'));
+    const mensaje = document.getElementById('mensajeAlumno');
+    const lista = document.getElementById('alumnosRegistrados');
+
+    if (!temaId) window.location.href = 'docente-tema.html';
+
+    function renderAlumnos(alumnos) {
+      lista.innerHTML = alumnos.length
+        ? `<h3>Alumnos registrados (${alumnos.length})</h3>${alumnos.map(alumno => `
+            <div class="wizard-lista-item">
+              <strong>${escaparHtml(alumno.nombre)} ${escaparHtml(alumno.apellido)}</strong>
+              <span>DNI: ${escaparHtml(alumno.dni)}</span>
+            </div>`).join('')}`
+        : '<p class="wizard-ayuda">Todavía no hay alumnos registrados.</p>';
+    }
+
+    async function cargarAlumnos() {
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`);
+        const data = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudieron cargar los alumnos.'));
+        renderAlumnos(Array.isArray(data) ? data : []);
+      } catch (error) {
+        mensaje.textContent = error.message || 'No se pudieron cargar los alumnos.';
+      }
+    }
+
+    document.getElementById('btnRegistrarAlumno').addEventListener('click', async () => {
+      const dni = document.getElementById('alumnoDni').value.trim();
+      if (!/^\d{7,8}$/.test(dni)) {
+        mensaje.textContent = 'Ingresá un DNI válido de 7 u 8 dígitos.';
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dni })
+        });
+        const data = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudo registrar el alumno.'));
+        mensaje.textContent = `Alumno ${data.nombre || ''} ${data.apellido || ''} registrado correctamente.`;
+        document.getElementById('alumnoDni').value = '';
+        cargarAlumnos();
+      } catch (error) {
+        mensaje.textContent = error.message || 'No se pudo conectar con el servidor.';
+      }
+    });
+
+    document.getElementById('btnSiguienteResultados').addEventListener('click', () => {
+      window.location.href = `docente-resultados.html?temaId=${temaId}`;
+    });
+
+    document.getElementById('btnCerrarSesion').addEventListener('click', () => {
+      borrarSesion();
+      window.location.href = 'index.html';
+    });
+
+    cargarAlumnos();
+  </script>
+</body>
+</html>

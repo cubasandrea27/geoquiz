@@ -170,18 +170,21 @@ router.post('/', authenticate, requireRole('docente'), async (req, res) => {
       ubicacionSeleccionada = ubicacionesDelTema[0]?.id;
     }
 
-    const [ubicaciones] = await connection.query(
-      'SELECT id FROM ubicaciones WHERE id = ? AND tema_id = ? AND activo = 1',
-      [ubicacionSeleccionada, temaId]
-    );
+    if (ubicacionSeleccionada) {
+      const [ubicaciones] = await connection.query(
+        'SELECT id FROM ubicaciones WHERE id = ? AND tema_id = ? AND activo = 1',
+        [ubicacionSeleccionada, temaId]
+      );
 
-    if (!ubicaciones.length) {
-      return res.status(400).json({ error: 'Primero cargá una ubicación activa para este tema' });
+      if (!ubicaciones.length) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'La ubicación seleccionada no pertenece al tema' });
+      }
     }
 
     const [result] = await connection.query(
       'INSERT INTO preguntas (tema_id, ubicacion_id, enunciado) VALUES (?, ?, ?)',
-      [temaId, ubicacionSeleccionada, enunciadoLimpio]
+      [temaId, ubicacionSeleccionada || null, enunciadoLimpio]
     );
 
     const preguntaId = result.insertId;
@@ -193,13 +196,50 @@ router.post('/', authenticate, requireRole('docente'), async (req, res) => {
 
     await connection.commit();
 
-    res.status(201).json({ message: 'Pregunta guardada', id: preguntaId });
+    res.status(201).json({ message: 'Pregunta guardada', id: preguntaId, ubicacionId: ubicacionSeleccionada || null });
   } catch (error) {
     await connection.rollback();
     console.error('Error al crear pregunta:', error);
     res.status(500).json({ error: 'No se pudo guardar la pregunta' });
   } finally {
     connection.release();
+  }
+});
+
+router.patch('/:id/ubicacion', authenticate, requireRole('docente'), async (req, res) => {
+  const preguntaId = Number(req.params.id);
+  const ubicacionId = Number(req.body.ubicacionId);
+
+  if (!Number.isInteger(preguntaId) || preguntaId <= 0 || !Number.isInteger(ubicacionId) || ubicacionId <= 0) {
+    return res.status(400).json({ error: 'Pregunta y ubicación son obligatorias' });
+  }
+
+  try {
+    const [preguntas] = await pool.query(`
+      SELECT p.id, p.tema_id
+      FROM preguntas p
+      JOIN temas t ON t.id = p.tema_id
+      WHERE p.id = ? AND p.activo = 1 AND t.activo = 1 AND t.docente_id = ?
+    `, [preguntaId, req.user.id]);
+
+    if (!preguntas.length) {
+      return res.status(404).json({ error: 'Pregunta no encontrada' });
+    }
+
+    const [ubicaciones] = await pool.query(
+      'SELECT id FROM ubicaciones WHERE id = ? AND tema_id = ? AND activo = 1',
+      [ubicacionId, preguntas[0].tema_id]
+    );
+
+    if (!ubicaciones.length) {
+      return res.status(400).json({ error: 'La ubicación no pertenece al tema de la pregunta' });
+    }
+
+    await pool.query('UPDATE preguntas SET ubicacion_id = ? WHERE id = ?', [ubicacionId, preguntaId]);
+    res.json({ message: 'Ubicación asignada a la pregunta', preguntaId, ubicacionId });
+  } catch (error) {
+    console.error('Error al asignar ubicación a la pregunta:', error);
+    res.status(500).json({ error: 'No se pudo asignar la ubicación' });
   }
 });
 

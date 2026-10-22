@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>GeoQuiz - Preparar tema</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <main class="wizard-pagina">
+    <header class="wizard-cabecera">
+      <div>
+        <p class="wizard-marca">GeoQuiz</p>
+        <h1>Preparar juego</h1>
+        <p>Completá el tema y sus preguntas antes de definir las ubicaciones.</p>
+      </div>
+      <button class="boton-secundario" id="btnCerrarSesion" type="button">Cerrar sesión</button>
+    </header>
+
+    <nav class="wizard-pasos" aria-label="Pasos del docente">
+      <span class="paso activo">1. Tema y preguntas</span>
+      <span class="paso">2. Ubicaciones</span>
+      <span class="paso">3. Alumnos</span>
+      <span class="paso">4. Resultados</span>
+    </nav>
+
+    <section class="wizard-tarjeta">
+      <h2>1. Datos generales del tema</h2>
+      <p class="wizard-ayuda">Creá un tema nuevo o seleccioná uno existente para continuar.</p>
+
+      <div class="campo wizard-campo">
+        <label for="nuevoTemaNombre">Nombre del tema</label>
+        <input type="text" id="nuevoTemaNombre" placeholder="Ej: Historia Argentina">
+      </div>
+      <div class="campo wizard-campo">
+        <label for="nuevoTemaDescripcion">Descripción</label>
+        <textarea id="nuevoTemaDescripcion" rows="3" placeholder="Descripción del tema"></textarea>
+      </div>
+      <button class="ingresar" id="btnCrearTema" type="button">Crear tema</button>
+
+      <div class="wizard-separador"><span>o continuar con un tema existente</span></div>
+
+      <div class="campo wizard-campo">
+        <label for="temaExistente">Tema / materia</label>
+        <select id="temaExistente">
+          <option value="">Cargando temas...</option>
+        </select>
+      </div>
+      <p id="mensajeTema" class="wizard-mensaje" role="status"></p>
+    </section>
+
+    <section class="wizard-tarjeta" id="bloquePreguntas" hidden>
+      <h2>2. Preguntas y respuestas</h2>
+      <p class="wizard-ayuda">Agregá una o más preguntas. Las ubicaciones se asignan en el siguiente paso.</p>
+
+      <div class="campo wizard-campo">
+        <label for="pregunta">Pregunta</label>
+        <textarea id="pregunta" rows="3" placeholder="Escribí la pregunta"></textarea>
+      </div>
+      <div class="campo wizard-campo">
+        <label for="opcion1">Opción 1</label>
+        <input id="opcion1" type="text" placeholder="Respuesta 1">
+      </div>
+      <div class="campo wizard-campo">
+        <label for="opcion2">Opción 2</label>
+        <input id="opcion2" type="text" placeholder="Respuesta 2">
+      </div>
+      <div class="campo wizard-campo">
+        <label for="opcion3">Opción 3</label>
+        <input id="opcion3" type="text" placeholder="Respuesta 3">
+      </div>
+      <div class="campo wizard-campo">
+        <label for="respuestaCorrecta">Respuesta correcta</label>
+        <select id="respuestaCorrecta">
+          <option value="1">Opción 1</option>
+          <option value="2">Opción 2</option>
+          <option value="3">Opción 3</option>
+        </select>
+      </div>
+
+      <button class="ingresar" id="btnGuardarPregunta" type="button">Agregar pregunta</button>
+      <p id="mensajePregunta" class="wizard-mensaje" role="status"></p>
+      <div id="preguntasCargadas" class="wizard-lista"></div>
+
+      <div class="wizard-acciones">
+        <button class="ingresar" id="btnSiguienteUbicaciones" type="button" disabled>
+          Siguiente: elegir ubicaciones
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/notificaciones.js"></script>
+  <script>
+    if (localStorage.getItem('rol') !== 'docente' || localStorage.getItem('isLoggedIn') !== 'true' || !localStorage.getItem('token')) {
+      window.location.href = 'index.html';
+      throw new Error('No autenticado');
+    }
+
+    const CLAVE_TEMA = 'geoquiz.wizard.temaId';
+    const CLAVE_PREGUNTAS = 'geoquiz.wizard.preguntas';
+    let temaId = Number(localStorage.getItem(CLAVE_TEMA)) || null;
+    let preguntas = JSON.parse(localStorage.getItem(CLAVE_PREGUNTAS) || '[]');
+
+    const temaSelect = document.getElementById('temaExistente');
+    const bloquePreguntas = document.getElementById('bloquePreguntas');
+    const preguntasCargadas = document.getElementById('preguntasCargadas');
+    const mensajeTema = document.getElementById('mensajeTema');
+    const mensajePregunta = document.getElementById('mensajePregunta');
+
+    function mostrarBloquePreguntas() {
+      bloquePreguntas.hidden = !temaId;
+      renderPreguntas();
+    }
+
+    function renderPreguntas() {
+      preguntasCargadas.innerHTML = preguntas.length
+        ? `<h3>Preguntas agregadas (${preguntas.length})</h3>${preguntas.map((item, index) => `
+            <div class="wizard-lista-item">
+              <strong>${index + 1}. ${escaparHtml(item.enunciado)}</strong>
+              <span>Pregunta guardada. Se ubicará en el paso siguiente.</span>
+            </div>`).join('')}`
+        : '<p class="wizard-ayuda">Todavía no agregaste preguntas.</p>';
+      document.getElementById('btnSiguienteUbicaciones').disabled = !temaId || !preguntas.length;
+    }
+
+    async function cargarTemas() {
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas/docente/${localStorage.getItem('userId')}`);
+        const temas = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, temas, 'No se pudieron cargar los temas.'));
+        temaSelect.innerHTML = '<option value="">Seleccioná un tema existente</option>';
+        temas.filter(tema => tema.activo !== 0).forEach(tema => {
+          const option = document.createElement('option');
+          option.value = tema.id;
+          option.textContent = tema.nombre;
+          temaSelect.appendChild(option);
+        });
+        if (temaId) temaSelect.value = String(temaId);
+        mostrarBloquePreguntas();
+      } catch (error) {
+        temaSelect.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+      }
+    }
+
+    document.getElementById('btnCrearTema').addEventListener('click', async () => {
+      const nombre = document.getElementById('nuevoTemaNombre').value.trim();
+      const descripcion = document.getElementById('nuevoTemaDescripcion').value.trim();
+      if (!nombre) {
+        mensajeTema.textContent = 'Ingresá el nombre del tema.';
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, descripcion })
+        });
+        const data = await leerJson(res);
+        if (!res.ok) {
+          mensajeTema.textContent = mensajeDeError(res, data, 'No se pudo crear el tema.');
+          return;
+        }
+        temaId = Number(data.id);
+        localStorage.setItem(CLAVE_TEMA, String(temaId));
+        localStorage.setItem(CLAVE_PREGUNTAS, '[]');
+        preguntas = [];
+        mensajeTema.textContent = `Tema "${data.nombre || nombre}" seleccionado.`;
+        await cargarTemas();
+      } catch (error) {
+        mensajeTema.textContent = error.message || 'No se pudo conectar con el servidor.';
+      }
+    });
+
+    temaSelect.addEventListener('change', () => {
+      temaId = Number(temaSelect.value) || null;
+      preguntas = [];
+      if (temaId) localStorage.setItem(CLAVE_TEMA, String(temaId));
+      else localStorage.removeItem(CLAVE_TEMA);
+      localStorage.setItem(CLAVE_PREGUNTAS, '[]');
+      mensajeTema.textContent = temaId ? 'Tema seleccionado.' : '';
+      mostrarBloquePreguntas();
+    });
+
+    document.getElementById('btnGuardarPregunta').addEventListener('click', async () => {
+      const enunciado = document.getElementById('pregunta').value.trim();
+      const opciones = [1, 2, 3].map(numero => document.getElementById(`opcion${numero}`).value.trim());
+      const respuestaCorrecta = Number(document.getElementById('respuestaCorrecta').value);
+      if (!temaId) return;
+      if (!enunciado || opciones.some(opcion => !opcion)) {
+        mensajePregunta.textContent = 'Completá la pregunta y las tres opciones.';
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/preguntas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ temaId, enunciado, opciones, respuestaCorrecta })
+        });
+        const data = await leerJson(res);
+        if (!res.ok) {
+          mensajePregunta.textContent = mensajeDeError(res, data, 'No se pudo guardar la pregunta.');
+          return;
+        }
+        preguntas.push({ id: data.id, enunciado });
+        localStorage.setItem(CLAVE_PREGUNTAS, JSON.stringify(preguntas));
+        [ 'pregunta', 'opcion1', 'opcion2', 'opcion3' ].forEach(id => document.getElementById(id).value = '');
+        mensajePregunta.textContent = 'Pregunta agregada correctamente.';
+        renderPreguntas();
+      } catch (error) {
+        mensajePregunta.textContent = error.message || 'No se pudo conectar con el servidor.';
+      }
+    });
+
+    document.getElementById('btnSiguienteUbicaciones').addEventListener('click', () => {
+      window.location.href = `docente-ubicaciones.html?temaId=${temaId}`;
+    });
+
+    document.getElementById('btnCerrarSesion').addEventListener('click', () => {
+      borrarSesion();
+      localStorage.removeItem(CLAVE_TEMA);
+      localStorage.removeItem(CLAVE_PREGUNTAS);
+      window.location.href = 'index.html';
+    });
+
+    cargarTemas();
+  </script>
+</body>
+</html>

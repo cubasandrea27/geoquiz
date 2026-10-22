@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>GeoQuiz - Resultados</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <main class="wizard-pagina">
+    <header class="wizard-cabecera">
+      <div>
+        <p class="wizard-marca">GeoQuiz</p>
+        <h1>Resultados del tema</h1>
+        <p>Consultá el desempeño de los alumnos y filtrá por DNI.</p>
+      </div>
+      <button class="boton-secundario" id="btnCerrarSesion" type="button">Cerrar sesión</button>
+    </header>
+
+    <nav class="wizard-pasos" aria-label="Pasos del docente">
+      <span class="paso completado">1. Tema y preguntas</span>
+      <span class="paso completado">2. Ubicaciones</span>
+      <span class="paso completado">3. Alumnos</span>
+      <span class="paso activo">4. Resultados</span>
+    </nav>
+
+    <section class="wizard-tarjeta">
+      <h2 id="tituloTema">Resultados</h2>
+      <div class="campo wizard-campo">
+        <label for="filtroDni">Filtrar por DNI</label>
+        <input id="filtroDni" type="text" maxlength="8" inputmode="numeric" placeholder="Ingresá el DNI o parte del DNI">
+      </div>
+      <button class="ingresar" id="btnCargarResultados" type="button">Actualizar resultados</button>
+      <p id="mensajeResultados" class="wizard-mensaje" role="status"></p>
+      <div id="resultados" class="wizard-lista"></div>
+
+      <div class="wizard-acciones">
+        <a class="boton-secundario" href="docente-alumnos.html">Volver a alumnos</a>
+        <button class="ingresar" id="btnNuevoTema" type="button">Preparar otro tema</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script>
+    if (localStorage.getItem('rol') !== 'docente' || localStorage.getItem('isLoggedIn') !== 'true' || !localStorage.getItem('token')) {
+      window.location.href = 'index.html';
+      throw new Error('No autenticado');
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const temaId = Number(params.get('temaId') || localStorage.getItem('geoquiz.wizard.temaId'));
+    let resultadosActuales = [];
+    const resultadosContenedor = document.getElementById('resultados');
+    const mensaje = document.getElementById('mensajeResultados');
+
+    if (!temaId) window.location.href = 'docente-tema.html';
+
+    function renderResultados() {
+      const filtro = document.getElementById('filtroDni').value.trim();
+      const filtrados = resultadosActuales.filter(alumno => !filtro || String(alumno.dni || '').includes(filtro));
+
+      resultadosContenedor.innerHTML = filtrados.length
+        ? filtrados.map(alumno => `
+            <article class="resultado-wizard">
+              <h3>${escaparHtml(alumno.nombre)} ${escaparHtml(alumno.apellido)}</h3>
+              <p><strong>DNI:</strong> ${escaparHtml(alumno.dni || 'Sin DNI')}</p>
+              <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
+              <ul>${alumno.respuestas.map(respuesta => `
+                <li>${escaparHtml(respuesta.pregunta)}: <strong>${escaparHtml(respuesta.resultado)}</strong></li>
+              `).join('')}</ul>
+            </article>`).join('')
+        : `<p class="wizard-ayuda">${filtro ? 'No hay resultados para ese DNI.' : 'Todavía no hay respuestas registradas.'}</p>`;
+    }
+
+    async function cargarResultados() {
+      mensaje.textContent = 'Cargando resultados...';
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
+        const data = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudieron cargar los resultados.'));
+        resultadosActuales = Array.isArray(data) ? data : [];
+        mensaje.textContent = '';
+        renderResultados();
+      } catch (error) {
+        mensaje.textContent = error.message || 'No se pudieron cargar los resultados.';
+      }
+    }
+
+    document.getElementById('filtroDni').addEventListener('input', renderResultados);
+    document.getElementById('btnCargarResultados').addEventListener('click', cargarResultados);
+    document.getElementById('btnNuevoTema').addEventListener('click', () => {
+      localStorage.removeItem('geoquiz.wizard.temaId');
+      localStorage.removeItem('geoquiz.wizard.preguntas');
+      localStorage.removeItem(`geoquiz.wizard.ubicaciones.${temaId}`);
+      window.location.href = 'docente-tema.html';
+    });
+    document.getElementById('btnCerrarSesion').addEventListener('click', () => {
+      borrarSesion();
+      window.location.href = 'index.html';
+    });
+
+    cargarResultados();
+  </script>
+</body>
+</html>

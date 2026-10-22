@@ -6,14 +6,15 @@ function getBasePath() {
 }
 
 function getDashboardPath() {
-  // Fuerza a cargar la versión actual de la pantalla después del login y evita
-  // que el navegador reutilice un dashboard anterior sin el envío del JWT.
-  return `${getBasePath()}dashboard.html?v=auth-fix-20261020`;
+  const pagina = localStorage.getItem('rol') === 'docente'
+    ? 'docente-tema.html'
+    : 'dashboard.html';
+  return `${getBasePath()}${pagina}?v=wizard-20261022`;
 }
 
 function redirectIfLoggedIn() {
   if (localStorage.getItem('isLoggedIn') === 'true' && localStorage.getItem('token')) {
-    window.location.href = `${getBasePath()}dashboard.html`;
+    window.location.href = getDashboardPath();
   } else if (localStorage.getItem('isLoggedIn') === 'true' && !localStorage.getItem('token')) {
     // Sesión creada por una versión anterior que todavía no guardaba JWT.
     // Se limpia para permitir un nuevo inicio de sesión sin bucles de redirección.
