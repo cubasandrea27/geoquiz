@@ -5,16 +5,16 @@
 :root {
   /* Paleta sobria: azul oscuro, azul grisáceo, blanco y negro */
   --bg: #0F3040;
-  --superficie: #464858;
+  --superficie: #21232b;
   --superficie-2: #0F3040;
-  --borde: #464858;
-  --borde-fuerte: #FFFFFF;
+  --borde: #0F3040;
+  --borde-fuerte: #201717;
 
   --texto: #FFFFFF;
   --texto-tenue: #FFFFFF;
 
-  --acento: #FFFFFF;
-  --acento-tinta: #0F3040;
+  --acento:#211a31;
+  --acento-tinta: #ffffff;
 
   --exito: #FFFFFF;
   --exito-tinta: #0F3040;
