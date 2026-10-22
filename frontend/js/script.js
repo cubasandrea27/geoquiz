@@ -58,6 +58,13 @@ function cambiarRol(btn, rol) {
 document.addEventListener('DOMContentLoaded', () => {
   redirectIfLoggedIn();
 
+  // Mensaje que deja el dashboard cuando la sesión venció
+  const mensajeLogin = sessionStorage.getItem('mensajeLogin');
+  if (mensajeLogin) {
+    sessionStorage.removeItem('mensajeLogin');
+    mostrarNotificacion(mensajeLogin, 'info', 6000);
+  }
+
   const btnIngresar = document.getElementById('btnIngresar');
 
   if (!btnIngresar) return;
@@ -73,17 +80,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = document.getElementById('password').value.trim();
 
     if (!credencial) {
-      alert(rolSeleccionado === 'docente' ? 'Ingresá tu email' : 'Ingresá tu DNI');
+      mostrarNotificacion(rolSeleccionado === 'docente' ? 'Ingresá tu email' : 'Ingresá tu DNI', 'error');
       return;
     }
 
     if (rolSeleccionado === 'alumno' && !/^[0-9]{8}$/.test(credencial)) {
-      alert('El DNI debe tener exactamente 8 dígitos numéricos.');
+      mostrarNotificacion('El DNI debe tener exactamente 8 dígitos numéricos.', 'error');
       return;
     }
 
     if (!password) {
-      alert('Ingresá tu contraseña');
+      mostrarNotificacion('Ingresá tu contraseña', 'error');
       return;
     }
 
@@ -102,14 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(body)
       });
 
-      const data = await res.json();
+      const data = await leerJson(res);
       if (!res.ok) {
-        alert(data.error || 'Error de ingreso.');
+        mostrarNotificacion(mensajeDeError(res, data, 'Error de ingreso.'), 'error');
         return;
       }
 
       if (!data.token) {
-        alert('El servidor no devolvió una sesión válida. Reiniciá el backend e intentá nuevamente.');
+        mostrarNotificacion('El servidor no devolvió una sesión válida. Reiniciá el backend e intentá nuevamente.', 'error');
         return;
       }
 
@@ -123,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('isLoggedIn', 'true');
       window.location.href = getDashboardPath();
     } catch (error) {
-      alert('No se pudo conectar con el servidor.');
+      mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
     }
   });
 });

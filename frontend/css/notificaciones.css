@@ -37,6 +37,8 @@
   transform: translateY(0);
 }
 
-.notificacion-error   { border-left-color: var(--error); }
-.notificacion-exito   { border-left-color: var(--exito); }
-.notificacion-info    { border-left-color: var(--acento); }
+/* Colores fijos para que se distinga un error de un éxito
+   (en styles.css --error y --exito son blancos) */
+.notificacion-error   { border-left-color: #D9756A; }
+.notificacion-exito   { border-left-color: #6FA287; }
+.notificacion-info    { border-left-color: #E8A33D; }

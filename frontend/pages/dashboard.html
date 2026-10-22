@@ -6,6 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store">
   <title>GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -162,6 +163,23 @@
         </div>
         <button class="ingresar" id="btnRegistrarAlumnoTema" type="button">Registrar alumno al tema</button>
 
+        <h3>Importar alumnos desde CSV</h3>
+        <p>El archivo tiene que tener las columnas <strong>nombre, apellido, dni y password</strong> (mínimo 8 caracteres).
+          Si lo tenés en Excel: Archivo → Guardar como → CSV.</p>
+        <div class="campo">
+          <label for="archivoAlumnosCsv">Archivo CSV</label>
+          <input type="file" id="archivoAlumnosCsv" accept=".csv,text/csv">
+        </div>
+        <div class="campo">
+          <label for="temaImportacion">Inscribirlos también en un tema (opcional)</label>
+          <select id="temaImportacion">
+            <option value="">No inscribir</option>
+          </select>
+        </div>
+        <div id="vistaPreviaCsv"></div>
+        <button class="ingresar" id="btnImportarAlumnos" type="button" disabled>Importar alumnos</button>
+        <div id="resultadoImportacion" aria-live="polite" style="margin-top:12px;"></div>
+
         <h3>Ver resultados</h3>
         <div class="campo">
           <label for="temaResultados">Tema</label>
@@ -174,6 +192,7 @@
           <input type="text" id="filtroAlumnoDniResultados" placeholder="Ingresá el DNI o parte del DNI" maxlength="8" inputmode="numeric">
         </div>
         <button class="ingresar" id="btnVerResultados" type="button">Ver resultados</button>
+        <button class="ingresar" id="btnExportarCsv" type="button" style="margin-top:8px;">Descargar resultados en CSV</button>
         <div id="contenedorResultadosDocente" style="margin-top:16px;"></div>
       </div>
     </section>
@@ -202,6 +221,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="../js/config.js"></script>
+  <script src="../js/notificaciones.js"></script>
   <script>
     const rol = localStorage.getItem('rol');
 
@@ -270,12 +290,15 @@
       document.getElementById('panel-docente').style.display = 'block';
       document.getElementById('btnBorrarTema').addEventListener('click', borrarTemaDocente);
       document.getElementById('btnVerResultados').addEventListener('click', verResultadosDocente);
+      document.getElementById('btnExportarCsv').addEventListener('click', exportarResultadosCsv);
       document.getElementById('btnRegistrarAlumnoTema').addEventListener('click', registrarAlumnoATema);
       document.getElementById('btnGuardarUbicacion').addEventListener('click', guardarUbicacionYPreguntaDocente);
       document.getElementById('btnUsarUbicacionActual').addEventListener('click', usarUbicacionActualDocente);
       document.getElementById('btnCrearTema').addEventListener('click', crearTemaDocente);
       document.getElementById('btnGuardarPregunta').addEventListener('click', guardarPreguntaDocente);
       document.getElementById('btnCancelarEdicionPregunta').addEventListener('click', cancelarEdicionPregunta);
+      document.getElementById('archivoAlumnosCsv').addEventListener('change', leerArchivoCsv);
+      document.getElementById('btnImportarAlumnos').addEventListener('click', importarAlumnosCsv);
       cargarTemasDocente();
       cargarTemasDocenteResultados();
       cargarTemasParaInscripcion();
@@ -319,9 +342,9 @@
         : `${API_BASE}/api/preguntas`;
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchConToken(url, {
           method,
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             ubicacionId,
@@ -330,10 +353,10 @@
             respuestaCorrecta
           })
         });
-        const data = await response.json();
+        const data = await leerJson(response);
 
         if (!response.ok) {
-          mensaje.textContent = data.error || 'No se pudo guardar la pregunta.';
+          mensaje.textContent = mensajeDeError(response, data, 'No se pudo guardar la pregunta.');
           mensaje.style.color = 'var(--error)';
           return;
         }
@@ -397,15 +420,15 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`, {
+        const res = await fetchConToken(`${API_BASE}/api/temas`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, descripcion })
         });
-        const data = await res.json();
+        const data = await leerJson(res);
 
         if (!res.ok) {
-          mensaje.textContent = data.error || 'No se pudo crear el tema.';
+          mensaje.textContent = mensajeDeError(res, data, 'No se pudo crear el tema.');
           mensaje.style.color = 'var(--error)';
           return;
         }
@@ -428,10 +451,19 @@
       }
     }
 
+    // Trae solo los temas activos del docente que inició sesión
+    // (GET /api/temas devuelve los temas de todos los docentes).
+    async function obtenerTemasDelDocente() {
+      const docenteId = localStorage.getItem('userId');
+      const res = await fetchConToken(`${API_BASE}/api/temas/docente/${docenteId}`);
+      const temas = await leerJson(res);
+      if (!res.ok) throw new Error(mensajeDeError(res, temas, 'No se pudieron cargar los temas.'));
+      return temas.filter(tema => tema.activo);
+    }
+
     async function cargarTemasDocente() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const temas = await obtenerTemasDelDocente();
         const select = document.getElementById('temaEliminar');
         select.innerHTML = '';
 
@@ -454,8 +486,7 @@
 
     async function cargarTemasDocenteResultados() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const temas = await obtenerTemasDelDocente();
         const select = document.getElementById('temaResultados');
         select.innerHTML = '';
 
@@ -478,8 +509,7 @@
 
     async function cargarTemasParaInscripcion() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const temas = await obtenerTemasDelDocente();
         const select = document.getElementById('temaAlumno');
         select.innerHTML = '';
 
@@ -495,17 +525,164 @@
           option.textContent = tema.nombre;
           select.appendChild(option);
         });
+
+        // Los mismos temas para inscribir a los alumnos importados por CSV
+        const selectImportacion = document.getElementById('temaImportacion');
+        selectImportacion.innerHTML = select.innerHTML;
+        selectImportacion.options[0].textContent = 'No inscribir';
       } catch (error) {
         document.getElementById('temaAlumno').innerHTML = '<option value="">No se pudieron cargar los temas</option>';
       }
+    }
+
+    // ---- Importación de alumnos desde CSV ----
+    let csvAlumnos = '';
+
+    // Excel en español guarda los CSV separados por punto y coma,
+    // pero el servidor espera comas. Si viene con ";" se cambia por ",".
+    function prepararCsv(texto) {
+      const primeraLinea = texto.split(/\r?\n/)[0];
+      if (primeraLinea.includes(';') && !primeraLinea.includes(',')) {
+        return texto.replace(/;/g, ',');
+      }
+      return texto;
+    }
+
+    async function leerArchivoCsv() {
+      const archivo = document.getElementById('archivoAlumnosCsv').files[0];
+      const vista = document.getElementById('vistaPreviaCsv');
+      const boton = document.getElementById('btnImportarAlumnos');
+      csvAlumnos = '';
+      boton.disabled = true;
+      vista.innerHTML = '';
+      document.getElementById('resultadoImportacion').innerHTML = '';
+
+      if (!archivo) return;
+
+      if (!archivo.name.toLowerCase().endsWith('.csv')) {
+        mostrarNotificacion('El archivo tiene que ser .csv. En Excel: Archivo → Guardar como → CSV.', 'error', 6000);
+        return;
+      }
+      if (archivo.size > 2 * 1024 * 1024) {
+        mostrarNotificacion('El archivo no puede pesar más de 2 MB.', 'error');
+        return;
+      }
+
+      const texto = prepararCsv(await archivo.text());
+      const lineas = texto.split(/\r?\n/).filter(linea => linea.trim());
+      const encabezados = (lineas[0] || '').replace(/^﻿/, '').split(',')
+        .map(columna => columna.replace(/"/g, '').trim().toLowerCase());
+      const faltan = ['nombre', 'apellido', 'dni'].filter(columna => !encabezados.includes(columna));
+      const columnaPassword = encabezados.findIndex(columna => ['password', 'contrasena', 'contraseña', 'clave'].includes(columna));
+      if (columnaPassword === -1) faltan.push('password');
+
+      if (faltan.length) {
+        vista.innerHTML = `<p style="color:#D9756A;">Al archivo le faltan las columnas: ${escaparHtml(faltan.join(', '))}</p>`;
+        return;
+      }
+      if (lineas.length < 2) {
+        vista.innerHTML = '<p>El archivo no tiene alumnos cargados.</p>';
+        return;
+      }
+
+      // Vista previa de las primeras 5 filas (sin mostrar las contraseñas)
+      const filas = lineas.slice(1, 6).map(linea => {
+        const valores = linea.split(',').map(valor => valor.replace(/"/g, '').trim());
+        return '<tr>' + encabezados.map((columna, i) =>
+          `<td>${i === columnaPassword ? '••••••••' : escaparHtml(valores[i])}</td>`
+        ).join('') + '</tr>';
+      }).join('');
+      const restantes = lineas.length - 1 - 5;
+
+      vista.innerHTML = `
+        <p><strong>${lineas.length - 1}</strong> alumnos en el archivo. Vista previa:</p>
+        <div class="tabla-scroll">
+          <table class="tabla-datos">
+            <thead><tr>${encabezados.map(columna => `<th>${escaparHtml(columna)}</th>`).join('')}</tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+        ${restantes > 0 ? `<p>... y ${restantes} más.</p>` : ''}
+      `;
+      csvAlumnos = texto;
+      boton.disabled = false;
+    }
+
+    async function importarAlumnosCsv() {
+      const boton = document.getElementById('btnImportarAlumnos');
+      const resultado = document.getElementById('resultadoImportacion');
+      const temaId = document.getElementById('temaImportacion').value;
+      if (!csvAlumnos) return;
+
+      boton.disabled = true;
+      resultado.innerHTML = '<p>Importando alumnos...</p>';
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/alumnos/importar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv' },
+          body: csvAlumnos
+        });
+        const data = await leerJson(res);
+
+        if (!res.ok) {
+          resultado.innerHTML = '';
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo importar el archivo.'), 'error');
+          boton.disabled = false;
+          return;
+        }
+
+        let html = `<p><strong>Importados:</strong> ${data.importados} de ${data.total}. <strong>Omitidos:</strong> ${data.omitidos}.</p>`;
+        if (data.errores && data.errores.length) {
+          html += '<p>Filas con problemas:</p><ul>' + data.errores.map(error =>
+            `<li>Fila ${error.linea} (DNI ${escaparHtml(error.dni || 'vacío')}): ${escaparHtml(error.error)}</li>`
+          ).join('') + '</ul>';
+        }
+
+        // Inscribir en el tema elegido a todos los DNI del archivo
+        // (los nuevos y los que ya existían).
+        if (temaId) {
+          const dnis = obtenerDnisDelCsv(csvAlumnos);
+          let inscriptos = 0;
+          for (const dni of dnis) {
+            const resInscripcion = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dni })
+            });
+            if (resInscripcion.ok) inscriptos++;
+          }
+          const nombreTema = document.getElementById('temaImportacion').selectedOptions[0].textContent;
+          html += `<p><strong>Inscriptos en ${escaparHtml(nombreTema)}:</strong> ${inscriptos} de ${dnis.length}.</p>`;
+        }
+
+        resultado.innerHTML = html;
+        mostrarNotificacion('Importación finalizada.', 'exito');
+        document.getElementById('archivoAlumnosCsv').value = '';
+        document.getElementById('vistaPreviaCsv').innerHTML = '';
+        csvAlumnos = '';
+      } catch (error) {
+        resultado.innerHTML = '';
+        mostrarNotificacion(error.message || 'No se pudo conectar con el servidor.', 'error');
+        boton.disabled = false;
+      }
+    }
+
+    function obtenerDnisDelCsv(texto) {
+      const lineas = texto.split(/\r?\n/).filter(linea => linea.trim());
+      const encabezados = lineas[0].replace(/^﻿/, '').split(',').map(columna => columna.replace(/"/g, '').trim().toLowerCase());
+      const columnaDni = encabezados.indexOf('dni');
+      const dnis = lineas.slice(1)
+        .map(linea => (linea.split(',')[columnaDni] || '').replace(/"/g, '').trim())
+        .filter(dni => /^\d{7,8}$/.test(dni));
+      return [...new Set(dnis)];
     }
 
     async function cargarTemasParaUbicacion() {
       const select = document.getElementById('ubicacionTema');
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const temas = await obtenerTemasDelDocente();
         select.innerHTML = '<option value="">Seleccioná un tema</option>';
 
         if (!Array.isArray(temas) || !temas.length) {
@@ -550,8 +727,7 @@
       const filtro = document.getElementById('preguntasTemaFiltro');
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const temas = await obtenerTemasDelDocente();
         filtro.innerHTML = '<option value="">Seleccioná un tema</option>';
 
         temas.forEach(tema => {
@@ -589,8 +765,8 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/preguntas/todas`);
-        const preguntas = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/preguntas/todas`);
+        const preguntas = await leerJson(res);
         preguntasActuales = preguntas.filter(pregunta => String(pregunta.temaId) === String(temaId));
 
         if (!preguntasActuales.length) {
@@ -600,8 +776,8 @@
 
         contenedor.innerHTML = preguntasActuales.map(pregunta => `
           <article style="border:1px solid var(--borde); padding:12px; margin-bottom:10px;">
-            <p><strong>${pregunta.enunciado}</strong></p>
-            <p>Opciones: ${pregunta.opcion1}, ${pregunta.opcion2}, ${pregunta.opcion3}</p>
+            <p><strong>${escaparHtml(pregunta.enunciado)}</strong></p>
+            <p>Opciones: ${escaparHtml(pregunta.opcion1)}, ${escaparHtml(pregunta.opcion2)}, ${escaparHtml(pregunta.opcion3)}</p>
             <p>Respuesta correcta: Opción ${pregunta.correcta}</p>
             <p>Ubicación: ${pregunta.ubicacionId || 'Sin ubicación'}</p>
             <button type="button" onclick="editarPreguntaDocente(${pregunta.id})">Editar</button>
@@ -625,15 +801,13 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
-          headers: getAuthHeaders()
-        });
-        const ubicaciones = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await leerJson(res);
         select.innerHTML = '<option value="">Seleccioná una ubicación</option>';
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
           option.value = ubicacion.id;
-          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.radio_metros} m)`;
+          option.textContent = `${escaparHtml(ubicacion.nombre || 'Sin nombre')} (${ubicacion.radio_metros} m)`;
           select.appendChild(option);
         });
       } catch (error) {
@@ -645,21 +819,20 @@
       if (!confirm('¿Querés eliminar esta pregunta?')) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/preguntas/${preguntaId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/preguntas/${preguntaId}`, {
+          method: 'DELETE'
         });
-        const data = await res.json();
+        const data = await leerJson(res);
 
         if (!res.ok) {
-          alert(data.error || 'No se pudo eliminar la pregunta.');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo eliminar la pregunta.'), 'error');
           return;
         }
 
-        alert('Pregunta eliminada correctamente.');
+        mostrarNotificacion('Pregunta eliminada correctamente.', 'exito');
         cargarPreguntasDelTema();
       } catch (error) {
-        alert('No se pudo conectar con el servidor.');
+        mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
       }
     }
 
@@ -671,14 +844,12 @@
       if (!temaId) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`, {
-          headers: getAuthHeaders()
-        });
-        const ubicaciones = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await leerJson(res);
         ubicaciones.forEach(ubicacion => {
           const option = document.createElement('option');
           option.value = ubicacion.id;
-          option.textContent = `${ubicacion.nombre || 'Sin nombre'} (${ubicacion.latitud}, ${ubicacion.longitud})`;
+          option.textContent = `${escaparHtml(ubicacion.nombre || 'Sin nombre')} (${ubicacion.latitud}, ${ubicacion.longitud})`;
           option.dataset.nombre = ubicacion.nombre || '';
           option.dataset.latitud = ubicacion.latitud;
           option.dataset.longitud = ubicacion.longitud;
@@ -739,7 +910,7 @@
 
     function usarUbicacionActualDocente() {
       if (!navigator.geolocation) {
-        alert('Tu navegador no permite obtener la ubicación.');
+        mostrarNotificacion('Tu navegador no permite obtener la ubicación.', 'error');
         return;
       }
 
@@ -748,7 +919,7 @@
           seleccionarCoordenadas(coords.latitude, coords.longitude);
           mapaDocente.setView([coords.latitude, coords.longitude], 17);
         },
-        () => alert('No se pudo obtener tu ubicación actual.'),
+        () => mostrarNotificacion('No se pudo obtener tu ubicación actual.', 'error'),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
@@ -764,23 +935,23 @@
       const radio = Number(radioTexto);
 
       if (!temaId) {
-        alert('Seleccioná un tema.');
+        mostrarNotificacion('Seleccioná un tema.', 'error');
         return;
       }
       if (!nombre) {
-        alert('Ingresá el nombre del lugar.');
+        mostrarNotificacion('Ingresá el nombre del lugar.', 'error');
         return;
       }
       if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90) {
-        alert('La latitud debe ser un número entre -90 y 90.');
+        mostrarNotificacion('La latitud debe ser un número entre -90 y 90.', 'error');
         return;
       }
       if (!Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
-        alert('La longitud debe ser un número entre -180 y 180.');
+        mostrarNotificacion('La longitud debe ser un número entre -180 y 180.', 'error');
         return;
       }
       if (!Number.isFinite(radio) || radio <= 0) {
-        alert('El radio debe ser un número mayor a cero, por ejemplo 50.');
+        mostrarNotificacion('El radio debe ser un número mayor a cero, por ejemplo 50.', 'error');
         return;
       }
 
@@ -788,9 +959,9 @@
         const url = ubicacionEnEdicionId
           ? `${API_BASE}/api/ubicaciones/${ubicacionEnEdicionId}`
           : `${API_BASE}/api/ubicaciones`;
-        const res = await fetch(url, {
+        const res = await fetchConToken(url, {
           method: ubicacionEnEdicionId ? 'PUT' : 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             nombre,
@@ -799,14 +970,14 @@
             radio_metros: radio
           })
         });
-        const data = await res.json();
+        const data = await leerJson(res);
 
         if (!res.ok) {
-          alert(data.error || 'No se pudo guardar la ubicación.');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo guardar la ubicación.'), 'error');
           return;
         }
 
-        alert(ubicacionEnEdicionId ? 'Ubicación actualizada correctamente.' : 'Ubicación GPS guardada correctamente.');
+        mostrarNotificacion(ubicacionEnEdicionId ? 'Ubicación actualizada correctamente.' : 'Ubicación GPS guardada correctamente.', 'exito');
         ubicacionEnEdicionId = null;
         document.getElementById('ubicacionNombre').value = '';
         document.getElementById('ubicacionLatitud').value = '';
@@ -814,7 +985,7 @@
         await cargarUbicacionesDocente();
         await cargarUbicacionesDelTema();
       } catch (error) {
-        alert('No se pudo conectar con el servidor.');
+        mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
       }
     }
 
@@ -839,29 +1010,29 @@
       const respuestaCorrecta = document.getElementById('respuestaCorrecta').value;
 
       if (!temaId) {
-        alert('Seleccioná un tema.');
+        mostrarNotificacion('Seleccioná un tema.', 'error');
         return;
       }
 
       if (!ubicacionId && !nombre) {
-        alert('Ingresá el nombre del lugar o elegí una ubicación existente.');
+        mostrarNotificacion('Ingresá el nombre del lugar o elegí una ubicación existente.', 'error');
         return;
       }
 
       if (!Number.isFinite(latitud) || !Number.isFinite(longitud) || !Number.isFinite(radio) || radio <= 0) {
-        alert('Seleccioná una ubicación del mapa o completá latitud, longitud y radio.');
+        mostrarNotificacion('Seleccioná una ubicación del mapa o completá latitud, longitud y radio.', 'error');
         return;
       }
 
       if (!enunciado || opciones.some(opcion => !opcion)) {
-        alert('Completá la pregunta y las 3 opciones antes de guardar.');
+        mostrarNotificacion('Completá la pregunta y las 3 opciones antes de guardar.', 'error');
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones/con-pregunta`, {
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones/con-pregunta`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             temaId,
             ubicacionId: ubicacionId || null,
@@ -874,14 +1045,14 @@
             respuestaCorrecta
           })
         });
-        const data = await res.json();
+        const data = await leerJson(res);
 
         if (!res.ok) {
-          alert(data.error || 'No se pudieron guardar la ubicación y la pregunta.');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudieron guardar la ubicación y la pregunta.'), 'error');
           return;
         }
 
-        alert('Ubicación y pregunta guardadas correctamente.');
+        mostrarNotificacion('Ubicación y pregunta guardadas correctamente.', 'exito');
         document.getElementById('ubicacionNombre').value = '';
         document.getElementById('ubicacionLatitud').value = '';
         document.getElementById('ubicacionLongitud').value = '';
@@ -891,7 +1062,7 @@
         document.getElementById('opcion3').value = '';
         await cargarUbicacionesDocente();
       } catch (error) {
-        alert('No se pudo conectar con el servidor.');
+        mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
       }
     }
 
@@ -909,15 +1080,15 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
-        const ubicaciones = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones?temaId=${temaId}`);
+        const ubicaciones = await leerJson(res);
 
         if (mapaDocente && capaUbicacionesGuardadas) {
           ubicaciones.forEach(ubicacion => {
             const marcador = L.marker([ubicacion.latitud, ubicacion.longitud]).addTo(capaUbicacionesGuardadas);
             const popup = document.createElement('div');
             popup.innerHTML = `
-              <strong>${ubicacion.nombre || 'Sin nombre'}</strong><br>
+              <strong>${escaparHtml(ubicacion.nombre || 'Sin nombre')}</strong><br>
               ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)<br>
               <button type="button" class="ingresar" style="margin-top:6px;">Eliminar ubicación</button>
             `;
@@ -929,7 +1100,7 @@
         contenedor.innerHTML = ubicaciones.length
           ? '<strong>Ubicaciones guardadas:</strong><ul>' + ubicaciones.map(ubicacion => `
               <li>
-                ${ubicacion.nombre || 'Sin nombre'}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)
+                ${escaparHtml(ubicacion.nombre || 'Sin nombre')}: ${ubicacion.latitud}, ${ubicacion.longitud} (radio ${ubicacion.radio_metros} m)
                 <button type="button" onclick="eliminarUbicacionDocente(${ubicacion.id})" style="margin-left:8px;">Eliminar</button>
               </li>
             `).join('') + '</ul>'
@@ -942,7 +1113,7 @@
     async function editarUbicacionDocente() {
       const ubicacionId = document.getElementById('ubicacionExistente').value;
       if (!ubicacionId) {
-        alert('Seleccioná una ubicación existente para editar.');
+        mostrarNotificacion('Seleccioná una ubicación existente para editar.', 'error');
         return;
       }
 
@@ -955,7 +1126,7 @@
       document.getElementById('ubicacionRadio').value = opcion.dataset.radio;
       document.getElementById('ubicacionTema').value = opcion.dataset.temaId;
       seleccionarCoordenadas(Number(opcion.dataset.latitud), Number(opcion.dataset.longitud));
-      alert('Modificá los datos y guardá para actualizar la ubicación.');
+      mostrarNotificacion('Modificá los datos y guardá para actualizar la ubicación.', 'info');
     }
 
     async function eliminarUbicacionDocente(ubicacionId) {
@@ -964,14 +1135,13 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/ubicaciones/${ubicacionId}`, {
+          method: 'DELETE'
         });
-        const data = await res.json();
+        const data = await leerJson(res);
 
         if (!res.ok) {
-          alert(data.error || 'No se pudo eliminar la ubicación.');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo eliminar la ubicación.'), 'error');
           return;
         }
 
@@ -982,7 +1152,7 @@
         await cargarUbicacionesDocente();
         await cargarUbicacionesDelTema();
       } catch (error) {
-        alert('No se pudo conectar con el servidor.');
+        mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
       }
     }
 
@@ -991,32 +1161,32 @@
       const dni = document.getElementById('alumnoDni').value.trim();
 
       if (!temaId || !dni) {
-        alert('Seleccioná un tema e ingresá el DNI del alumno');
+        mostrarNotificacion('Seleccioná un tema e ingresá el DNI del alumno', 'error');
         return;
       }
 
       if (!/^[0-9]{7,8}$/.test(dni)) {
-        alert('Ingresá un DNI válido (solo números)');
+        mostrarNotificacion('Ingresá un DNI válido (solo números)', 'error');
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas/${temaId}/alumnos`, {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dni })
         });
 
-        const data = await res.json();
+        const data = await leerJson(res);
         if (!res.ok) {
-          alert(data.error || 'No se pudo registrar al alumno');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo registrar al alumno'), 'error');
           return;
         }
 
-        alert(`Alumno ${data.nombre || ''} ${data.apellido || ''} registrado correctamente en el tema`.trim());
+        mostrarNotificacion(`Alumno ${data.nombre || ''} ${data.apellido || ''} registrado correctamente en el tema`.trim(), 'exito');
         document.getElementById('alumnoDni').value = '';
       } catch (error) {
-        alert('No se pudo conectar con el servidor');
+        mostrarNotificacion('No se pudo conectar con el servidor', 'error');
       }
     }
 
@@ -1025,7 +1195,7 @@
       const temaId = select.value;
 
       if (!temaId) {
-        alert('Seleccioná un tema para borrar');
+        mostrarNotificacion('Seleccioná un tema para borrar', 'error');
         return;
       }
 
@@ -1034,21 +1204,20 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/temas/${temaId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}`, {
+          method: 'DELETE'
         });
 
-        const data = await res.json();
+        const data = await leerJson(res);
         if (!res.ok) {
-          alert(data.error || 'No se pudo borrar el tema');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo borrar el tema'), 'error');
           return;
         }
 
-        alert('Tema borrado correctamente');
+        mostrarNotificacion('Tema borrado correctamente', 'exito');
         await cargarTemasDocente();
       } catch (error) {
-        alert('No se pudo conectar con el servidor');
+        mostrarNotificacion('No se pudo conectar con el servidor', 'error');
       }
     }
 
@@ -1064,51 +1233,126 @@
       contenedor.innerHTML = '<p>Cargando resultados...</p>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/por-tema/${temaId}`, {
-          headers: getAuthHeaders()
-        });
-        const respuesta = await res.json();
+        // resumen: porcentaje por alumno (incluye inscriptos sin respuestas)
+        // detalle: cada respuesta de cada alumno
+        // inscriptos: para tener el DNI de cada alumno y poder filtrar
+        const [resResumen, resDetalle, resInscriptos] = await Promise.all([
+          fetchConToken(`${API_BASE}/api/reportes/resumen/${temaId}`),
+          fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`),
+          fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`)
+        ]);
+        const resumen = await leerJson(resResumen);
+        const detalle = await leerJson(resDetalle);
+        const inscriptos = await leerJson(resInscriptos);
 
-        if (!res.ok) {
-          contenedor.innerHTML = `<p>${respuesta.error || 'No se pudieron cargar los resultados.'}</p>`;
+        if (!resResumen.ok) {
+          contenedor.innerHTML = `<p>${escaparHtml(mensajeDeError(resResumen, resumen, 'No se pudieron cargar los resultados.'))}</p>`;
           return;
         }
+
+        const dniPorAlumno = {};
+        (Array.isArray(inscriptos) ? inscriptos : []).forEach(alumno => { dniPorAlumno[alumno.id] = alumno.dni; });
+        const respuestasPorAlumno = {};
+        (Array.isArray(detalle) ? detalle : []).forEach(alumno => { respuestasPorAlumno[alumno.alumno_id] = alumno.respuestas; });
 
         const filtroDni = document.getElementById('filtroAlumnoDniResultados').value.trim();
-        const resultados = Array.isArray(respuesta)
-          ? respuesta.filter(alumno => !filtroDni || String(alumno.dni || '').includes(filtroDni))
-          : [];
+        const alumnos = resumen.alumnos.filter(alumno => !filtroDni || String(dniPorAlumno[alumno.alumno_id] || '').includes(filtroDni));
 
-        if (!resultados.length) {
-          contenedor.innerHTML = filtroDni
-            ? '<p>No hay resultados para el DNI ingresado.</p>'
-            : '<p>No hay respuestas registradas para este tema aún.</p>';
+        if (!resumen.alumnos.length) {
+          contenedor.innerHTML = '<p>Este tema todavía no tiene alumnos inscriptos.</p>';
+          return;
+        }
+        if (!alumnos.length) {
+          contenedor.innerHTML = '<p>No hay alumnos con ese DNI en este tema.</p>';
           return;
         }
 
-        contenedor.innerHTML = resultados.map(alumno => {
-          const respuestasHtml = alumno.respuestas.map(resp => `
-            <li>${resp.pregunta}: <strong>${resp.resultado}</strong> (${resp.opcion_elegida})</li>
+        // Totales del tema
+        const totalRespuestas = resumen.alumnos.reduce((suma, alumno) => suma + Number(alumno.respuestas), 0);
+        const totalCorrectas = resumen.alumnos.reduce((suma, alumno) => suma + Number(alumno.correctas), 0);
+        const conRespuestas = resumen.alumnos.filter(alumno => Number(alumno.respuestas) > 0).length;
+        const promedio = totalRespuestas ? Math.round((totalCorrectas / totalRespuestas) * 100) : 0;
+
+        const resumenHtml = `
+          <div class="resumen-tema">
+            <div><span class="dato">${resumen.alumnos.length}</span><span>inscriptos</span></div>
+            <div><span class="dato">${conRespuestas}</span><span>respondieron</span></div>
+            <div><span class="dato">${totalRespuestas}</span><span>respuestas</span></div>
+            <div><span class="dato">${promedio}%</span><span>aciertos</span></div>
+          </div>
+        `;
+
+        const alumnosHtml = alumnos.map(alumno => {
+          const respondidas = Number(alumno.respuestas);
+          const porcentaje = respondidas ? Number(alumno.porcentaje) : 0;
+          const respuestas = respuestasPorAlumno[alumno.alumno_id] || [];
+          const respuestasHtml = respuestas.map(resp => `
+            <li>${escaparHtml(resp.pregunta)}: <strong style="color:${resp.resultado === 'correcta' ? '#6FA287' : '#D9756A'};">${escaparHtml(resp.resultado)}</strong> (${escaparHtml(resp.opcion_elegida)})</li>
           `).join('');
 
           return `
-            <div style="border:1px solid var(--borde); padding:10px; margin-bottom:10px;">
-              <h3>${alumno.nombre} ${alumno.apellido}</h3>
-              <p><strong>DNI:</strong> ${alumno.dni || 'Sin DNI'}</p>
-              <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
-              <ul>${respuestasHtml}</ul>
+            <div class="tarjeta-resultado">
+              <h3>${escaparHtml(alumno.nombre)} ${escaparHtml(alumno.apellido)}</h3>
+              <p><strong>DNI:</strong> ${escaparHtml(dniPorAlumno[alumno.alumno_id] || 'Sin DNI')}</p>
+              ${respondidas
+                ? `<div class="barra-aciertos" role="img" aria-label="${porcentaje}% de respuestas correctas">
+                     <span style="width:${porcentaje}%;"></span>
+                   </div>
+                   <p class="dato">${alumno.correctas} de ${respondidas} correctas (${porcentaje}%)</p>
+                   <details>
+                     <summary>Ver respuestas</summary>
+                     <ul>${respuestasHtml}</ul>
+                   </details>`
+                : '<p>Todavía no respondió preguntas.</p>'}
             </div>
           `;
         }).join('');
+
+        contenedor.innerHTML = resumenHtml + alumnosHtml;
       } catch (error) {
-        contenedor.innerHTML = '<p>No se pudieron cargar los resultados.</p>';
+        contenedor.innerHTML = `<p>${escaparHtml(error.message || 'No se pudieron cargar los resultados.')}</p>`;
       }
     }
 
+    // Descarga el CSV de respuestas del tema. Se usa fetch (y no un link común)
+    // porque la ruta necesita el token en el encabezado.
+    async function exportarResultadosCsv() {
+      const select = document.getElementById('temaResultados');
+      const temaId = select.value;
+
+      if (!temaId) {
+        mostrarNotificacion('Seleccioná un tema para descargar el CSV.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/reportes/csv/${temaId}`);
+        if (!res.ok) {
+          const data = await leerJson(res);
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo descargar el CSV.'), 'error');
+          return;
+        }
+
+        const archivo = await res.blob();
+        const nombreTema = select.selectedOptions[0].textContent.replace(/[^a-z0-9_-]/gi, '_');
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(archivo);
+        enlace.download = `resultados_${nombreTema}.csv`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        URL.revokeObjectURL(enlace.href);
+        mostrarNotificacion('CSV descargado.', 'exito');
+      } catch (error) {
+        mostrarNotificacion(error.message || 'No se pudo conectar con el servidor.', 'error');
+      }
+    }
+
+
     async function cargarTemasDisponiblesParaInscripcion() {
       try {
-        const res = await fetch(`${API_BASE}/api/temas`);
-        const temas = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/temas`);
+        const temas = await leerJson(res);
         const select = document.getElementById('temaInscripcion');
         select.innerHTML = '';
 
@@ -1135,32 +1379,32 @@
       const temaId = document.getElementById('temaInscripcion').value;
 
       if (!temaId) {
-        alert('Seleccioná un tema para inscribirte');
+        mostrarNotificacion('Seleccioná un tema para inscribirte', 'error');
         return;
       }
 
       if (!localStorage.getItem('token')) {
-        alert('La sesión no es válida. Volvé a iniciar sesión.');
+        mostrarNotificacion('La sesión no es válida. Volvé a iniciar sesión.', 'error');
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/tema-alumno`, {
+        const res = await fetchConToken(`${API_BASE}/api/tema-alumno`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ temaId })
         });
 
-        const data = await res.json();
+        const data = await leerJson(res);
         if (!res.ok) {
-          alert(data.error || 'No se pudo completar la inscripción');
+          mostrarNotificacion(mensajeDeError(res, data, 'No se pudo completar la inscripción'), 'error');
           return;
         }
 
-        alert('Te inscribiste correctamente al tema');
+        mostrarNotificacion('Te inscribiste correctamente al tema', 'exito');
         await cargarMateriasAlumno();
       } catch (error) {
-        alert('No se pudo conectar con el servidor');
+        mostrarNotificacion('No se pudo conectar con el servidor', 'error');
       }
     }
 
@@ -1175,11 +1419,9 @@
           return;
         }
 
-        const inscripcionRes = await fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`, {
-          headers: getAuthHeaders()
-        });
-        const temasInscritos = await inscripcionRes.json();
-        if (!inscripcionRes.ok) throw new Error(temasInscritos.error || 'No se pudieron cargar tus temas.');
+        const inscripcionRes = await fetchConToken(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`);
+        const temasInscritos = await leerJson(inscripcionRes);
+        if (!inscripcionRes.ok) throw new Error(mensajeDeError(inscripcionRes, temasInscritos, 'No se pudieron cargar tus temas.'));
 
         if (!temasInscritos.length) {
           select.innerHTML = '<option value="">No estás inscripto a ningún tema</option>';
@@ -1233,10 +1475,9 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
-          headers: getAuthHeaders()
-        });
-        const preguntas = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/preguntas?${params}`);
+        const preguntas = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, preguntas, 'No se pudieron cargar las preguntas.'));
 
         if (!preguntas.length) {
           contenedor.innerHTML = '<p>No hay preguntas cercanas a tu ubicación.</p>';
@@ -1253,7 +1494,7 @@
           finalizarCuestionario();
         }
       } catch (error) {
-        contenedor.innerHTML = `<p>${error.message || 'No se pudieron cargar las preguntas.'}</p>`;
+        contenedor.innerHTML = `<p>${escaparHtml(error.message || 'No se pudieron cargar las preguntas.')}</p>`;
       }
     }
 
@@ -1288,11 +1529,9 @@
           lng: ubicacionAlumno.longitud,
           precision: ubicacionAlumno.precision
         });
-        const res = await fetch(`${API_BASE}/api/preguntas?${params}`, {
-          headers: getAuthHeaders()
-        });
-        const preguntasRespuesta = await res.json();
-        if (!res.ok) throw new Error(preguntasRespuesta.error || 'No se pudieron consultar las preguntas.');
+        const res = await fetchConToken(`${API_BASE}/api/preguntas?${params}`);
+        const preguntasRespuesta = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, preguntasRespuesta, 'No se pudieron consultar las preguntas.'));
 
         const preguntas = filtrarPreguntasRespondidas(preguntasRespuesta, temaId);
         const idsActuales = preguntasActuales.map(pregunta => pregunta.id).sort().join(',');
@@ -1346,8 +1585,8 @@
       const card = document.createElement('div');
       card.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Puntaje: ${puntaje}</div>
-        <h3>${indiceActual + 1}. ${pregunta.enunciado}</h3>
-        ${pregunta.opciones.map(opcion => `<label><input type="radio" name="pregunta-${pregunta.id}" value="${opcion.id}"> ${opcion.texto}</label><br>`).join('')}
+        <h3>${indiceActual + 1}. ${escaparHtml(pregunta.enunciado)}</h3>
+        ${pregunta.opciones.map(opcion => `<label><input type="radio" name="pregunta-${pregunta.id}" value="${opcion.id}"> ${escaparHtml(opcion.texto)}</label><br>`).join('')}
         <p id="resultado-${pregunta.id}" style="margin-top:8px; font-weight:bold;"></p>
         <button id="btnSiguiente" type="button" style="margin-top:10px;" disabled>Siguiente</button>
       `;
@@ -1384,9 +1623,9 @@
 
         botonSiguiente.disabled = true;
         try {
-          const res = await fetch(`${API_BASE}/api/respuestas`, {
+          const res = await fetchConToken(`${API_BASE}/api/respuestas`, {
             method: 'POST',
-            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               alumnoId: localStorage.getItem('userId'),
               preguntaId: pregunta.id,
@@ -1396,8 +1635,8 @@
               precision: ubicacionAlumno.precision
             })
           });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'No se pudo registrar la respuesta.');
+          const data = await leerJson(res);
+          if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudo registrar la respuesta.'));
           puntaje += data.esCorrecta ? 1 : 0;
           const resumen = resumenTemas[temaActualId] || {
             nombre: document.querySelector('#temaSeleccionado option:checked')?.textContent || 'Tema',
@@ -1433,7 +1672,7 @@
           botonSiguiente.disabled = false;
           return;
         } catch (error) {
-          alert(error.message);
+          mostrarNotificacion(error.message, 'error');
           botonSiguiente.disabled = false;
           return;
         }
@@ -1451,7 +1690,7 @@
         .filter(resumen => resumen.respondidas > 0)
         .map(resumen => `
           <tr>
-            <td>${resumen.nombre}</td>
+            <td>${escaparHtml(resumen.nombre)}</td>
             <td>${resumen.correctas}</td>
             <td>${resumen.incorrectas}</td>
             <td>${resumen.respondidas}</td>
@@ -1460,7 +1699,7 @@
 
       contenedor.innerHTML = `
         <h2>Resumen de respuestas</h2>
-        <p>Terminaste las preguntas disponibles de <strong>${resumenActual?.nombre || 'este tema'}</strong>.</p>
+        <p>Terminaste las preguntas disponibles de <strong>${escaparHtml(resumenActual?.nombre || 'este tema')}</strong>.</p>
         <p>Puntaje del tema: <strong>${puntaje}</strong></p>
         <table style="width:100%; border-collapse:collapse; margin-top:16px;">
           <thead>
@@ -1485,14 +1724,7 @@
 
     function cerrarSesion() {
       detenerMonitoreoUbicacion();
-      localStorage.removeItem('rol');
-      localStorage.removeItem('dni');
-      localStorage.removeItem('email');
-      localStorage.removeItem('nombre');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('docenteId');
-      localStorage.removeItem('token');
-      localStorage.removeItem('isLoggedIn');
+      borrarSesion();
       window.location.href = 'index.html';
     }
   </script>
