@@ -1,7 +1,12 @@
-// El backend Node escucha en el puerto 3000 del equipo que sirve la aplicación.
-// Se obtiene el hostname de la página para que el mismo código funcione desde
-// localhost, desde una IP de red local o desde un dominio publicado.
-const API_BASE = `${window.location.protocol}//${window.location.hostname}:3000`;
+// Dónde está la API:
+// - Por http (XAMPP en la compu o IP local): el backend Node escucha en el
+//   puerto 3000 del mismo equipo que sirve la página.
+// - Por https (túnel de ngrok para probar el GPS desde el celular): Apache
+//   redirige /api al backend con ProxyPass, así que la API queda en el mismo
+//   origen que la página (ver "Probar desde el celular" en el README).
+const API_BASE = window.location.protocol === 'https:'
+  ? ''
+  : `${window.location.protocol}//${window.location.hostname}:3000`;
 
 function getAuthHeaders(extra = {}) {
   const token = (localStorage.getItem('token') || '').trim();
