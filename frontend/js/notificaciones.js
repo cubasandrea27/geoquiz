@@ -15,6 +15,9 @@ function obtenerContenedorNotificaciones() {
   if (!contenedor) {
     contenedor = document.createElement('div');
     contenedor.id = 'contenedor-notificaciones';
+    // aria-live: los lectores de pantalla leen el mensaje cuando aparece
+    contenedor.setAttribute('aria-live', 'polite');
+    contenedor.setAttribute('role', 'status');
     document.body.appendChild(contenedor);
   }
   return contenedor;

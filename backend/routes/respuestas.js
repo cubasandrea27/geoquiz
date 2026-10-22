@@ -1,0 +1,312 @@
+const express = require('express');
+const router  = express.Router();
+const pool = require('../utils/db');
+const { authenticate, requireRole } = require('../middleware/auth');
+
+router.get('/alumno/:alumnoId', authenticate, requireRole('alumno'), async (req, res) => {
+  const { alumnoId } = req.params;
+
+  if (!alumnoId) {
+    return res.status(400).json({ error: 'Falta el alumnoId' });
+  }
+  if (Number(alumnoId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar las respuestas de otro alumno' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        t.id AS tema_id,
+        t.nombre AS tema_nombre,
+        p.enunciado AS pregunta,
+        o.texto AS opcion_elegida,
+        r.es_correcta,
+        r.respondida_en
+      FROM respuestas r
+      JOIN preguntas p ON p.id = r.pregunta_id
+      JOIN temas t ON t.id = p.tema_id
+      LEFT JOIN opciones o ON o.id = r.opcion_id
+      WHERE r.alumno_id = ?
+      ORDER BY t.nombre, r.respondida_en ASC
+    `, [alumnoId]);
+
+    const resultados = {};
+
+    rows.forEach(row => {
+      if (!resultados[row.tema_id]) {
+        resultados[row.tema_id] = {
+          tema_id: row.tema_id,
+          tema_nombre: row.tema_nombre,
+          correctas: 0,
+          incorrectas: 0,
+          respuestas: []
+        };
+      }
+
+      const tema = resultados[row.tema_id];
+      const correcta = Boolean(row.es_correcta);
+      tema.correctas += correcta ? 1 : 0;
+      tema.incorrectas += correcta ? 0 : 1;
+      tema.respuestas.push({
+        pregunta: row.pregunta,
+        opcion_elegida: row.opcion_elegida || 'Sin respuesta',
+        resultado: correcta ? 'Correcto' : 'Incorrecto',
+        respondida_en: row.respondida_en
+      });
+    });
+
+    res.json(Object.values(resultados));
+  } catch (error) {
+    console.error('Error al listar resultados del alumno:', error);
+    res.status(500).json({ error: 'No se pudieron listar tus resultados' });
+  }
+});
+
+// Todas las respuestas de los alumnos, agrupadas por alumno, para todos
+// los temas de un docente. Sirve para la sección "Ver respuestas" del
+// panel docente, incluyendo el tema al que pertenece cada pregunta para
+// poder filtrar del lado del cliente sin pegarle de nuevo a la API.
+router.get('/docente/:docenteId', authenticate, requireRole('docente'), async (req, res) => {
+  const { docenteId } = req.params;
+
+  if (!docenteId) {
+    return res.status(400).json({ error: 'Falta el docenteId' });
+  }
+  if (Number(docenteId) !== Number(req.user.id)) {
+    return res.status(403).json({ error: 'No puedes consultar las respuestas de otro docente' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        a.id AS alumno_id,
+        a.nombre,
+        a.apellido,
+        a.dni,
+        p.id AS pregunta_id,
+        p.enunciado AS pregunta,
+        t.id AS tema_id,
+        t.nombre AS tema_nombre,
+        o.texto AS opcion_elegida,
+        o.es_correcta,
+        CASE
+          WHEN o.es_correcta = 1 THEN 'correcta'
+          ELSE 'incorrecta'
+        END AS resultado,
+        r.respondida_en
+      FROM respuestas r
+      JOIN alumnos a   ON a.id = r.alumno_id
+      JOIN preguntas p ON p.id = r.pregunta_id
+      JOIN temas t     ON t.id = p.tema_id
+      LEFT JOIN opciones o ON o.id = r.opcion_id
+      WHERE t.docente_id = ?
+      ORDER BY a.apellido, a.nombre, r.respondida_en DESC
+    `, [docenteId]);
+
+    const resultados = {};
+
+    rows.forEach(row => {
+      if (!resultados[row.alumno_id]) {
+        resultados[row.alumno_id] = {
+          alumno_id: row.alumno_id,
+          nombre: row.nombre,
+          apellido: row.apellido,
+          dni: row.dni,
+          respuestas: []
+        };
+      }
+
+      resultados[row.alumno_id].respuestas.push({
+        pregunta_id: row.pregunta_id,
+        pregunta: row.pregunta,
+        tema_id: row.tema_id,
+        tema_nombre: row.tema_nombre,
+        opcion_elegida: row.opcion_elegida || 'Sin respuesta',
+        resultado: row.resultado,
+        respondida_en: row.respondida_en
+      });
+    });
+
+    res.json(Object.values(resultados));
+  } catch (error) {
+    console.error('Error al listar respuestas del docente:', error);
+    res.status(500).json({ error: 'No se pudieron listar las respuestas' });
+  }
+});
+
+// Registrar la respuesta de un alumno a una pregunta.
+router.post('/', authenticate, requireRole('alumno'), async (req, res) => {
+  const { preguntaId, opcionId, latitud, longitud, precision } = req.body;
+  const alumnoId = req.user.id;
+
+  if (!preguntaId || !opcionId) {
+    return res.status(400).json({ error: 'preguntaId y opcionId son requeridos' });
+  }
+
+  const lat = Number(latitud);
+  const lng = Number(longitud);
+  const margenGps = Number(precision) > 0 ? Number(precision) : 0;
+  if (!Number.isFinite(margenGps) || margenGps < 0 || margenGps > 100000) {
+    return res.status(400).json({ error: 'La precisión GPS no es válida' });
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'Se requiere una ubicación GPS válida' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [inscripciones] = await connection.query(
+      `SELECT 1 FROM tema_alumno ta
+       JOIN preguntas p ON p.tema_id = ta.tema_id
+       WHERE ta.alumno_id = ? AND p.id = ? LIMIT 1`,
+      [alumnoId, preguntaId]
+    );
+
+    if (!inscripciones.length) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'El alumno no está registrado en el tema de esta pregunta' });
+    }
+
+    const [preguntas] = await connection.query(`
+      SELECT p.id, u.latitud, u.longitud, u.radio_metros
+      FROM preguntas p
+      JOIN temas t ON t.id = p.tema_id AND t.activo = 1
+      JOIN ubicaciones u ON u.id = p.ubicacion_id AND u.activo = 1
+      WHERE p.id = ? AND p.activo = 1
+      LIMIT 1
+    `, [preguntaId]);
+
+    if (!preguntas.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'La pregunta no tiene una ubicación activa' });
+    }
+
+    const preguntaUbicacion = preguntas[0];
+    const [distancias] = await connection.query(`
+      SELECT (6371 * ACOS(LEAST(1, GREATEST(-1,
+        COS(RADIANS(?)) * COS(RADIANS(?))
+        * COS(RADIANS(?) - RADIANS(?))
+        + SIN(RADIANS(?)) * SIN(RADIANS(?))
+      )))) * 1000 AS distancia
+    `, [lat, preguntaUbicacion.latitud, lng, preguntaUbicacion.longitud, lat, preguntaUbicacion.latitud]);
+
+    if (distancias[0].distancia > preguntaUbicacion.radio_metros + margenGps) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'Debés estar dentro del radio de la ubicación para responder' });
+    }
+
+    const [bloqueos] = await connection.query(
+      `SELECT 1 FROM bloqueos_pregunta
+       WHERE alumno_id = ? AND pregunta_id = ? AND bloqueada_hasta > NOW()
+       LIMIT 1`,
+      [alumnoId, preguntaId]
+    );
+
+    if (bloqueos.length) {
+      await connection.rollback();
+      return res.status(409).json({ error: 'Esta pregunta está temporalmente bloqueada' });
+    }
+
+    const [opciones] = await connection.query(
+      'SELECT id, es_correcta FROM opciones WHERE id = ? AND pregunta_id = ?',
+      [opcionId, preguntaId]
+    );
+
+    if (!opciones.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'La opción no pertenece a esa pregunta' });
+    }
+
+    const esCorrecta = opciones[0].es_correcta ? 1 : 0;
+
+    const [result] = await connection.query(
+      `INSERT INTO respuestas (alumno_id, pregunta_id, opcion_id, es_correcta, latitud_resp, longitud_resp)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [alumnoId, preguntaId, opcionId, esCorrecta, lat, lng]
+    );
+
+    await connection.query(
+      `INSERT INTO bloqueos_pregunta (alumno_id, pregunta_id, bloqueada_hasta)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))
+       ON DUPLICATE KEY UPDATE bloqueada_hasta = VALUES(bloqueada_hasta)`,
+      [alumnoId, preguntaId]
+    );
+
+    await connection.commit();
+
+    res.status(201).json({ message: 'Respuesta registrada', id: result.insertId, esCorrecta: !!esCorrecta });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al registrar respuesta:', error);
+    res.status(500).json({ error: 'No se pudo registrar la respuesta' });
+  } finally {
+    connection.release();
+  }
+});
+
+router.get('/por-tema/:temaId', authenticate, requireRole('docente'), async (req, res) => {
+  const { temaId } = req.params;
+
+  if (!temaId) {
+    return res.status(400).json({ error: 'Falta el temaId' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        a.id AS alumno_id,
+        a.nombre,
+        a.apellido,
+        p.id AS pregunta_id,
+        p.enunciado AS pregunta,
+        o.texto AS opcion_elegida,
+        o.es_correcta,
+        CASE 
+          WHEN o.es_correcta = 1 THEN 'correcta'
+          ELSE 'incorrecta'
+        END AS resultado
+      FROM respuestas r
+      JOIN alumnos a ON a.id = r.alumno_id
+      JOIN preguntas p ON p.id = r.pregunta_id
+      JOIN temas t ON t.id = p.tema_id
+      LEFT JOIN opciones o ON o.id = r.opcion_id
+      WHERE p.tema_id = ? AND t.docente_id = ?
+      ORDER BY a.apellido, a.nombre, p.id ASC
+    `, [temaId, req.user.id]);
+
+    const resultados = {};
+
+    rows.forEach(row => {
+      if (!resultados[row.alumno_id]) {
+        resultados[row.alumno_id] = {
+          alumno_id: row.alumno_id,
+          nombre: row.nombre,
+          apellido: row.apellido,
+          respuestas: [],
+          puntaje: 0
+        };
+      }
+
+      const respuesta = {
+        pregunta_id: row.pregunta_id,
+        pregunta: row.pregunta,
+        opcion_elegida: row.opcion_elegida || 'Sin respuesta',
+        resultado: row.resultado
+      };
+
+      resultados[row.alumno_id].respuestas.push(respuesta);
+      if (row.resultado === 'correcta') {
+        resultados[row.alumno_id].puntaje += 1;
+      }
+    });
+
+    res.json(Object.values(resultados));
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudieron listar las respuestas' });
+  }
+});
+
+module.exports = router;

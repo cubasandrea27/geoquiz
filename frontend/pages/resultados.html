@@ -5,32 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mis resultados - GeoQuiz</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
 </head>
 <body>
-  <main style="max-width:900px; margin:0 auto; padding:24px;">
-    <h1>Mis resultados</h1>
+  <!-- Usa los mismos estilos que el panel del alumno del dashboard (#panel-alumno) -->
+  <main id="panel-alumno" style="margin:0 auto;">
+    <h2>Mis resultados</h2>
     <p>Resultados de las materias en las que respondiste preguntas.</p>
-    <div id="estado">Cargando resultados...</div>
-    <button type="button" onclick="window.location.href='dashboard.html'">Volver al panel</button>
+    <div id="estado" aria-live="polite">Cargando resultados...</div>
+    <button class="ingresar" type="button" onclick="window.location.href='dashboard.html'" style="margin-top:16px;">Volver al panel</button>
   </main>
 
   <script src="../js/config.js"></script>
+  <script src="../js/notificaciones.js"></script>
   <script>
     const alumnoId = localStorage.getItem('userId');
 
-    if (localStorage.getItem('rol') !== 'alumno' || localStorage.getItem('isLoggedIn') !== 'true' || !alumnoId) {
+    if (localStorage.getItem('rol') !== 'alumno' || localStorage.getItem('isLoggedIn') !== 'true' || !alumnoId || !localStorage.getItem('token')) {
       window.location.href = 'index.html';
+      throw new Error('No autenticado');
     }
 
     async function cargarResultados() {
       const estado = document.getElementById('estado');
 
       try {
-        const res = await fetch(`${API_BASE}/api/respuestas/alumno/${alumnoId}`);
-        const resultados = await res.json();
+        const res = await fetchConToken(`${API_BASE}/api/respuestas/alumno/${alumnoId}`);
+        const resultados = await leerJson(res);
 
         if (!res.ok) {
-          throw new Error(resultados.error || 'No se pudieron cargar los resultados.');
+          throw new Error(mensajeDeError(res, resultados, 'No se pudieron cargar los resultados.'));
         }
 
         if (!resultados.length) {
@@ -38,24 +42,33 @@
           return;
         }
 
-        estado.innerHTML = resultados.map(tema => `
-          <section style="margin:20px 0; padding:16px; border:1px solid #ccc;">
-            <h2>${tema.tema_nombre}</h2>
-            <p><strong>Puntaje:</strong> ${tema.correctas} de ${tema.correctas + tema.incorrectas}</p>
-            <p><strong>Correctas:</strong> ${tema.correctas} | <strong>Incorrectas:</strong> ${tema.incorrectas}</p>
-            <ul>
-              ${tema.respuestas.map(respuesta => `
-                <li style="margin:8px 0;">
-                  ${respuesta.pregunta}<br>
-                  <strong>Respuesta:</strong> ${respuesta.opcion_elegida}
-                  <span style="color:${respuesta.resultado === 'Correcto' ? 'green' : 'crimson'};">(${respuesta.resultado})</span>
-                </li>
-              `).join('')}
-            </ul>
-          </section>
-        `).join('');
+        estado.innerHTML = resultados.map(tema => {
+          const total = tema.correctas + tema.incorrectas;
+          const porcentaje = total ? Math.round((tema.correctas / total) * 100) : 0;
+          return `
+            <section class="tarjeta-resultado">
+              <h3>${escaparHtml(tema.tema_nombre)}</h3>
+              <div class="barra-aciertos" role="img" aria-label="${porcentaje}% de respuestas correctas">
+                <span style="width:${porcentaje}%;"></span>
+              </div>
+              <p class="dato">${tema.correctas} de ${total} correctas (${porcentaje}%)</p>
+              <details>
+                <summary>Ver respuestas</summary>
+                <ul>
+                  ${tema.respuestas.map(respuesta => `
+                    <li style="margin:8px 0;">
+                      ${escaparHtml(respuesta.pregunta)}<br>
+                      <strong>Respuesta:</strong> ${escaparHtml(respuesta.opcion_elegida)}
+                      <strong style="color:${respuesta.resultado === 'Correcto' ? '#6FA287' : '#D9756A'};">(${respuesta.resultado})</strong>
+                    </li>
+                  `).join('')}
+                </ul>
+              </details>
+            </section>
+          `;
+        }).join('');
       } catch (error) {
-        estado.innerHTML = `<p>${error.message}</p>`;
+        estado.innerHTML = `<p>${escaparHtml(error.message)}</p>`;
       }
     }
 

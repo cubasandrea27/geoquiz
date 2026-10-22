@@ -120,6 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('nombre');
     localStorage.removeItem('dni');
     localStorage.removeItem('email');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isLoggedIn');
     window.location.href = 'index.html';
   });
 });
@@ -915,7 +917,7 @@ async function renderPreguntasCercanas() {
   try {
     const [ubicacion, temasRes] = await Promise.all([
       obtenerUbicacionActual(),
-      fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`)
+      fetch(`${API_BASE}/api/tema-alumno/alumno/${alumnoId}`, { headers: getAuthHeaders() })
     ]);
     const temasInscritos = await temasRes.json();
 
@@ -926,7 +928,7 @@ async function renderPreguntasCercanas() {
         lat: ubicacion.lat,
         lng: ubicacion.lng
       });
-      const res = await fetch(`${API_BASE}/api/preguntas?${params}`);
+      const res = await fetch(`${API_BASE}/api/preguntas?${params}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('No se pudieron cargar las preguntas.');
       const preguntasTema = await res.json();
       return preguntasTema.map((pregunta) => ({ ...pregunta, temaNombre: tema.nombre }));
@@ -1032,7 +1034,7 @@ async function renderMisTemas() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
+    const res = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`, { headers: getAuthHeaders() });
     const temasInscritos = await res.json();
 
     if (!temasInscritos.length) {
@@ -1117,7 +1119,7 @@ async function renderMateriasDisponibles() {
     const temasCarrera = await resCarrera.json();
 
     // Obtener temas en los que ya estoy inscrito
-    const resInscripciones = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`);
+    const resInscripciones = await fetch(`${API_BASE}/api/tema-alumno/alumno/${userId}`, { headers: getAuthHeaders() });
     const temasInscritos = await resInscripciones.json();
     const idsTemasInscritos = temasInscritos.map(t => t.id);
 
@@ -1192,7 +1194,7 @@ async function inscribirseAlTema(temaId) {
   try {
     const res = await fetch(`${API_BASE}/api/tema-alumno`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ alumnoId: userId, temaId })
     });
 

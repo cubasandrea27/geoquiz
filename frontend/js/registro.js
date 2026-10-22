@@ -36,12 +36,12 @@ async function registrarUsuario() {
   const email = document.getElementById('email').value.trim();
 
   if (!nombre || !apellido || !password || (rolSeleccionado === 'alumno' ? !dni : !email)) {
-    alert('Completá todos los campos obligatorios.');
+    mostrarNotificacion('Completá todos los campos obligatorios.', 'error');
     return;
   }
 
   if (rolSeleccionado === 'alumno' && !/^[0-9]{8}$/.test(dni)) {
-    alert('El DNI debe tener exactamente 8 dígitos numéricos.');
+    mostrarNotificacion('El DNI debe tener exactamente 8 dígitos numéricos.', 'error');
     return;
   }
 
@@ -60,17 +60,18 @@ async function registrarUsuario() {
       body: JSON.stringify(body)
     });
 
-    const data = await res.json();
+    const data = await leerJson(res);
 
     if (!res.ok) {
-      alert(data.error || 'Error al registrar el usuario.');
+      mostrarNotificacion(mensajeDeError(res, data, 'Error al registrar el usuario.'), 'error');
       return;
     }
 
-    alert('Registro exitoso. Ahora podés ingresar.');
-    window.location.href = 'index.html';
+    mostrarNotificacion('Registro exitoso. Ahora podés ingresar.', 'exito');
+    // Se espera un momento para que se llegue a leer el mensaje
+    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
   } catch (error) {
-    alert('No se pudo conectar con el servidor.');
+    mostrarNotificacion('No se pudo conectar con el servidor.', 'error');
   }
 }
 

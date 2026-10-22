@@ -1,18 +1,18 @@
 
 :root {
-  --bg:        #12232E;
-  --superficie: #1B3441;
-  --superficie-2: #223F4E;
-  --borde:     #2E4653;
-  --borde-fuerte: #35505E;
-  --texto:     #EDE6D6;
-  --texto-tenue: #8FA3AC;
-  --acento:    #E8A33D;
-  --acento-tinta: #12232E;
-  --exito:     #6FA287;
-  --exito-tinta: #10261B;
-  --error:     #D9756A;
-  --error-tinta: #2E120E;
+  --bg:        #557945;
+  --superficie: #5D9253;
+  --superficie-2: #5D9253;
+  --borde:     #557945;
+  --borde-fuerte: #FFCB3D;
+  --texto:     #FFCB3D;
+  --texto-tenue: #F1A344;
+  --acento:    #FFCB3D;
+  --acento-tinta: #557945;
+  --exito:     #5D9253;
+  --exito-tinta: #FFCB3D;
+  --error:     #F1A344;
+  --error-tinta: #557945;
 }
 
 * {
