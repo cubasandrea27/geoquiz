@@ -29,7 +29,15 @@ async function inscribirse(req, res) {
       return res.status(404).json({ error: 'Tema no encontrado' });
     }
 
-    // Inscribir al alumno
+    const [inscripcionExistente] = await pool.query(
+      'SELECT id FROM tema_alumno WHERE tema_id = ? AND alumno_id = ? LIMIT 1',
+      [temaId, alumnoId]
+    );
+
+    if (inscripcionExistente.length) {
+      return res.status(409).json({ error: 'El alumno ya está inscripto en este tema' });
+    }
+
     await pool.query(
       'INSERT IGNORE INTO tema_alumno (tema_id, alumno_id) VALUES (?, ?)',
       [temaId, alumnoId]

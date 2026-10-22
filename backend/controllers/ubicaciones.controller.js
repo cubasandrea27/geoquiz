@@ -146,6 +146,60 @@ async function createWithQuestion(req, res) {
   }
 }
 
+async function assignQuestionWithLocation(req, res) {
+  const { preguntaId, nombre, latitud, longitud, radio_metros } = req.body;
+  const radio = radio_metros == null ? 50 : Number(radio_metros);
+  const pregunta = Number(preguntaId);
+
+  if (!Number.isInteger(pregunta) || pregunta <= 0 || latitud == null || longitud == null ||
+      !validarCoordenadas(latitud, longitud, radio)) {
+    return res.status(400).json({ error: 'Pregunta, latitud y longitud son obligatorias' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [preguntas] = await connection.query(`
+      SELECT p.id, p.tema_id
+      FROM preguntas p
+      JOIN temas t ON t.id = p.tema_id
+      WHERE p.id = ? AND p.activo = 1 AND t.activo = 1 AND t.docente_id = ?
+      LIMIT 1
+    `, [pregunta, req.user.id]);
+
+    if (!preguntas.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Pregunta no encontrada' });
+    }
+
+    const [ubicacion] = await connection.query(
+      `INSERT INTO ubicaciones (tema_id, nombre, latitud, longitud, radio_metros)
+       VALUES (?, ?, ?, ?, ?)`,
+      [preguntas[0].tema_id, nombre || null, Number(latitud), Number(longitud), radio]
+    );
+
+    await connection.query(
+      'UPDATE preguntas SET ubicacion_id = ? WHERE id = ? AND activo = 1',
+      [ubicacion.insertId, pregunta]
+    );
+
+    await connection.commit();
+    return res.status(201).json({
+      message: 'Ubicación creada y asignada correctamente',
+      ubicacionId: ubicacion.insertId,
+      preguntaId: pregunta
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al asignar ubicación a la pregunta:', error);
+    return res.status(500).json({ error: 'No se pudo crear y asignar la ubicación' });
+  } finally {
+    connection.release();
+  }
+}
+
 async function update(req, res) {
   const { id } = req.params;
   const { nombre, latitud, longitud, radio_metros } = req.body;
@@ -198,4 +252,4 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { list, create, createWithQuestion, update, remove };
+module.exports = { list, create, createWithQuestion, assignQuestionWithLocation, update, remove };

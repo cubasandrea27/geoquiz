@@ -260,6 +260,7 @@ router.get('/por-tema/:temaId', authenticate, requireRole('docente'), async (req
         a.id AS alumno_id,
         a.nombre,
         a.apellido,
+        a.dni,
         p.id AS pregunta_id,
         p.enunciado AS pregunta,
         o.texto AS opcion_elegida,
@@ -285,6 +286,7 @@ router.get('/por-tema/:temaId', authenticate, requireRole('docente'), async (req
           alumno_id: row.alumno_id,
           nombre: row.nombre,
           apellido: row.apellido,
+          dni: row.dni,
           respuestas: [],
           puntaje: 0
         };

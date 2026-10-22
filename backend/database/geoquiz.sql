@@ -147,6 +147,22 @@ CREATE TABLE bloqueos_pregunta (
   CONSTRAINT fk_blq_pregunta FOREIGN KEY (pregunta_id) REFERENCES preguntas(id)
 );
 
+-- ------------------------------------------------------------
+-- RECUPERACION DE CONTRASEÑA
+-- ------------------------------------------------------------
+CREATE TABLE recuperacion_password (
+  id             INT          NOT NULL AUTO_INCREMENT,
+  usuario_tipo   VARCHAR(20)  NOT NULL,
+  usuario_id     INT          NOT NULL,
+  token_hash     CHAR(64)     NOT NULL,
+  vence_en       DATETIME     NOT NULL,
+  usado_en       DATETIME     NULL,
+  creado_en      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_recuperacion_token (token_hash),
+  KEY idx_recuperacion_usuario (usuario_tipo, usuario_id, usado_en, vence_en)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 -- NOTIFICACIONES PERSISTENTES
 -- ============================================================
