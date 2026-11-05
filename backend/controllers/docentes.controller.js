@@ -10,8 +10,8 @@ async function register(req, res) {
   if (!nombre || !apellido || !email || !password) {
     return res.status(400).json({ error: 'Todos los campos son obligatorios' });
   }
-  if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
-    return res.status(400).json({ error: 'Email inválido o contraseña demasiado corta (mínimo 8 caracteres)' });
+  if (!/^\S+@\S+\.\S+$/.test(email) || password.length !== 8) {
+    return res.status(400).json({ error: 'Email inválido o la contraseña no tiene exactamente 8 caracteres' });
   }
   try {
     const hash = await bcrypt.hash(password, 10);

@@ -83,8 +83,8 @@ async function restablecerPassword(req, res) {
   if (!/^[a-f0-9]{64}$/i.test(token)) {
     return res.status(400).json({ error: 'El token de recuperación no es válido' });
   }
-  if (nuevaPassword.length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  if (nuevaPassword.length !== 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener exactamente 8 caracteres' });
   }
 
   const connection = await pool.getConnection();

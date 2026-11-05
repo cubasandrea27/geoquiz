@@ -78,7 +78,10 @@ cd geoquiz
 cd backend
 npm install
 
-# 5. Iniciar el backend desde Windows PowerShell
+# 5. Si la base ya existía, aplicar la migración de recuperación de contraseña
+# Ejecutar backend/database/migrate-password-reset.sql en phpMyAdmin
+
+# 6. Iniciar el backend desde Windows PowerShell
 npm start
 ```
 
@@ -91,10 +94,10 @@ http://localhost/geoquiz/
 La API queda disponible en:
 
 ```text
-http://localhost:3000
+http://localhost:3001
 ```
 
-No ejecutar dos instancias del backend al mismo tiempo. Si el puerto 3000 ya
+No ejecutar dos instancias del backend al mismo tiempo. Si el puerto 3001 ya
 esta ocupado, cerrar la instancia anterior antes de ejecutar `npm start`.
 
 ## Variables de entorno (.env)
@@ -106,7 +109,7 @@ DB_NAME=geoquiz
 DB_USER=root
 DB_PASSWORD=
 
-PORT=3000
+PORT=3001
 JWT_SECRET=geoquiz2026
 JWT_EXPIRES_IN=8h
 ```
@@ -151,14 +154,14 @@ Editar `xampp/apache/conf/httpd.conf` (¡no `.htaccess`!):
    ```
 2. Agregar al final del archivo:
    ```apache
-   ProxyPass /api http://localhost:3000/api
-   ProxyPassReverse /api http://localhost:3000/api
+   ProxyPass /api http://localhost:3001/api
+   ProxyPassReverse /api http://localhost:3001/api
    ```
 3. Guardar y reiniciar Apache desde el Panel de Control de XAMPP (Stop →
    Start).
 
 Con esto, cualquier request a `/api/...` que le llegue a Apache (puerto 80)
-se redirige automáticamente al backend Node (puerto 3000), sin que el
+se redirige automáticamente al backend Node (puerto 3001), sin que el
 frontend necesite saber la URL del backend. Por eso en
 `frontend/js/config.js` la base de la API queda vacía:
 
@@ -263,12 +266,16 @@ el lugar seleccionado o dentro de su radio de deteccion.
 | `POST` | `/api/alumnos/register` | Registrar alumno |
 | `POST` | `/api/alumnos/login` | Autenticar alumno |
 | `POST` | `/api/alumnos/importar` | Importar alumnos desde CSV (requiere JWT de docente) |
+| `POST` | `/api/recuperacion/solicitar` | Solicitar recuperación con DNI o email |
+| `POST` | `/api/recuperacion/restablecer` | Restablecer contraseña con token de un solo uso |
 | `GET` | `/api/health` | Verificar disponibilidad de API y base de datos |
 | `GET` | `/api/temas` | Listar temas activos |
 | `POST` | `/api/temas` | Crear tema |
 | `POST` | `/api/ubicaciones` | Guardar coordenada GPS |
-| `GET` | `/api/preguntas?temaId=...&alumnoId=...&lat=...&lng=...` | Buscar preguntas cercanas |
+| `POST` | `/api/ubicaciones/asignar-pregunta` | Crear ubicación y asignarla a una pregunta en una transacción |
+| `GET` | `/api/preguntas?temaId=...&lat=...&lng=...&precision=...` | Buscar preguntas cercanas (el alumno se identifica por JWT) |
 | `POST` | `/api/respuestas` | Guardar respuesta y bloqueo de 5 minutos |
+| `GET` | `/api/respuestas/por-tema/:temaId` | Resultados del docente, incluyendo DNI del alumno |
 
 ### Importación de alumnos
 
@@ -281,12 +288,47 @@ Ana,Pérez,12345678,clave-segura
 
 Se permiten hasta 1000 alumnos y archivos de hasta 2 MB. Los DNI repetidos o filas inválidas se informan en `errores` sin impedir la importación de las filas válidas.
 
+### Recuperación de contraseña
+
+Para solicitar una recuperación:
+
+```json
+POST /api/recuperacion/solicitar
+{ "credencial": "DNI o email" }
+```
+
+Para restablecerla:
+
+```json
+POST /api/recuperacion/restablecer
+{ "token": "token-recibido", "nuevaPassword": "nueva-clave" }
+```
+
+Los tokens vencen según `RESET_TOKEN_TTL_MINUTES` y solo pueden utilizarse una vez. Para pruebas locales se puede activar `RESET_EXPOSE_TOKEN=true`; no debe activarse en producción sin integrar un servicio de correo.
+
 ## Credenciales de prueba
 
 ```text
 Docente: jperez@escuela.edu / 12345678
 Alumna: 12345678 / 12345678
 Alumno: 87654321 / 87654321
+```
+
+### Cuentas demo para clases
+
+Se pueden volver a cargar ejecutando `backend/database/seed-test-users.sql`.
+
+```text
+Docente Ana:  ana.martinez@geoquiz.test / Profe001
+Docente Luis: luis.fernandez@geoquiz.test / Profe002
+Docente demo: docente.demo@geoquiz.test / Profe003
+
+Alumna Sofía:     30000001 / 30000001
+Alumno Mateo:     30000002 / 30000002
+Alumna Valentina: 30000003 / 30000003
+Alumno Benjamín:  30000004 / 30000004
+Alumna Martina:   30000005 / 30000005
+Alumno Joaquín:   30000006 / 30000006
 ```
 
 ##  Convenciones de branches

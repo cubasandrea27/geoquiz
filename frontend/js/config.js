@@ -1,12 +1,12 @@
 // Dónde está la API:
 // - Por http (XAMPP en la compu o IP local): el backend Node escucha en el
-//   puerto 3000 del mismo equipo que sirve la página.
+//   puerto 3001 del mismo equipo que sirve la página.
 // - Por https (túnel de ngrok para probar el GPS desde el celular): Apache
 //   redirige /api al backend con ProxyPass, así que la API queda en el mismo
 //   origen que la página (ver "Probar desde el celular" en el README).
 const API_BASE = window.location.protocol === 'https:'
   ? ''
-  : `${window.location.protocol}//${window.location.hostname}:3000`;
+  : `${window.location.protocol}//${window.location.hostname}:3001`;
 
 function getAuthHeaders(extra = {}) {
   const token = (localStorage.getItem('token') || '').trim();
@@ -64,8 +64,31 @@ function escaparHtml(texto) {
 }
 
 // Arma un mensaje claro para el usuario según el error que devolvió el servidor.
+function textoDeError(error) {
+  if (typeof error === 'string' && error.trim()) return error.trim();
+
+  if (Array.isArray(error)) {
+    const mensajes = error.map(textoDeError).filter(Boolean);
+    return mensajes.length ? mensajes.join(' ') : '';
+  }
+
+  if (error && typeof error === 'object') {
+    // Las APIs y los validadores no siempre usan la misma propiedad.
+    for (const clave of ['message', 'mensaje', 'detail', 'error']) {
+      const mensaje = textoDeError(error[clave]);
+      if (mensaje) return mensaje;
+    }
+
+    const mensajes = Object.values(error).map(textoDeError).filter(Boolean);
+    if (mensajes.length) return mensajes.join(' ');
+  }
+
+  return '';
+}
+
 function mensajeDeError(res, data, mensajePorDefecto) {
-  if (data && data.error) return data.error;
+  const mensajeApi = textoDeError(data && (data.error ?? data.message ?? data.mensaje ?? data.detail));
+  if (mensajeApi) return mensajeApi;
   if (res.status === 400) return 'Revisá los datos ingresados.';
   if (res.status === 403) return 'No tenés permiso para hacer esto.';
   if (res.status === 404) return 'No se encontró lo que buscabas.';

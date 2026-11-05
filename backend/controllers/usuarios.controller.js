@@ -23,6 +23,9 @@ async function create(req, res) {
   if (!['docente', 'alumno'].includes(rol) || !nombre || !apellido || !password) {
     return res.status(400).json({ error: 'Faltan datos obligatorios o el rol no es válido' });
   }
+  if (String(password).length !== 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener exactamente 8 caracteres' });
+  }
   if (rol === 'docente' && !email) return res.status(400).json({ error: 'El email es obligatorio para docentes' });
   if (rol === 'alumno' && !dni) return res.status(400).json({ error: 'El DNI es obligatorio para alumnos' });
 

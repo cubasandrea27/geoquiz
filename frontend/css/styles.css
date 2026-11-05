@@ -925,6 +925,17 @@ body:not(:has(.contenedor)) > #btnCerrarSesion:hover {
   text-align: center;
 }
 
+.boton-peligro {
+  border-color: #D9756A;
+  color: #FFFFFF;
+  background: #8F3F3A;
+}
+
+.boton-peligro:hover {
+  border-color: #E58B82;
+  background: #A94D46;
+}
+
 .boton-secundario {
   display: inline-flex;
   align-items: center;

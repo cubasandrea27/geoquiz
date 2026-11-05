@@ -56,7 +56,7 @@ async function importarAlumnos(req, res) {
       const dni = obtenerValor(row, ['dni']);
       const password = obtenerValor(row, [...ALIAS_PASSWORD]);
 
-      if (!nombre || !apellido || !/^\d{7,8}$/.test(dni) || password.length < 8) {
+      if (!nombre || !apellido || !/^\d{7,8}$/.test(dni) || password.length !== 8) {
         resultado.omitidos += 1;
         resultado.errores.push({ linea, dni, error: 'Nombre, apellido, DNI válido y contraseña de 8 caracteres son obligatorios' });
         continue;

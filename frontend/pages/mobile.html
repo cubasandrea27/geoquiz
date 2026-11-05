@@ -37,6 +37,7 @@
     let pregunta = null;
     let ubicacion = null; // { latitud, longitud, precision } del GPS del alumno
     let deferredInstallPrompt = null;
+    let temporizadorDesbloqueo = null;
 
     if (!token || localStorage.getItem('rol') !== 'alumno') {
       window.location.href = 'index.html';
@@ -153,6 +154,11 @@
       // La corrección la decide el servidor
       mostrarNotificacion(data.esCorrecta ? '¡Correcto!' : 'Incorrecto', data.esCorrecta ? 'exito' : 'error');
       document.getElementById('quiz').style.display = 'none';
+      document.getElementById('estadoGps').textContent = 'Esta pregunta volverá a estar disponible en 5 minutos.';
+      clearTimeout(temporizadorDesbloqueo);
+      temporizadorDesbloqueo = setTimeout(() => {
+        if (temaId) cargarQuiz();
+      }, 5 * 60 * 1000 + 1000);
     }
 
     async function cargarNotificaciones() {

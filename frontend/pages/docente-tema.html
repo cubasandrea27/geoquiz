@@ -47,6 +47,22 @@
           <option value="">Cargando temas...</option>
         </select>
       </div>
+
+      <div id="administrarTema" hidden>
+        <h3>Editar tema seleccionado</h3>
+        <div class="campo wizard-campo">
+          <label for="editarTemaNombre">Nombre</label>
+          <input type="text" id="editarTemaNombre" placeholder="Nombre del tema">
+        </div>
+        <div class="campo wizard-campo">
+          <label for="editarTemaDescripcion">Descripción</label>
+          <textarea id="editarTemaDescripcion" rows="3" placeholder="Descripción del tema"></textarea>
+        </div>
+        <div class="wizard-acciones">
+          <button class="ingresar" id="btnActualizarTema" type="button">Guardar cambios</button>
+          <button class="boton-secundario boton-peligro" id="btnEliminarTema" type="button">Eliminar tema</button>
+        </div>
+      </div>
       <p id="mensajeTema" class="wizard-mensaje" role="status"></p>
     </section>
 
@@ -103,16 +119,26 @@
     const CLAVE_PREGUNTAS = 'geoquiz.wizard.preguntas';
     let temaId = Number(localStorage.getItem(CLAVE_TEMA)) || null;
     let preguntas = JSON.parse(localStorage.getItem(CLAVE_PREGUNTAS) || '[]');
+    let temasDisponibles = [];
 
     const temaSelect = document.getElementById('temaExistente');
     const bloquePreguntas = document.getElementById('bloquePreguntas');
     const preguntasCargadas = document.getElementById('preguntasCargadas');
+    const administrarTema = document.getElementById('administrarTema');
     const mensajeTema = document.getElementById('mensajeTema');
     const mensajePregunta = document.getElementById('mensajePregunta');
 
     function mostrarBloquePreguntas() {
       bloquePreguntas.hidden = !temaId;
       renderPreguntas();
+    }
+
+    function mostrarAdministracionTema() {
+      const tema = temasDisponibles.find(item => Number(item.id) === Number(temaId));
+      administrarTema.hidden = !tema;
+      if (!tema) return;
+      document.getElementById('editarTemaNombre').value = tema.nombre || '';
+      document.getElementById('editarTemaDescripcion').value = tema.descripcion || '';
     }
 
     function renderPreguntas() {
@@ -131,14 +157,20 @@
         const res = await fetchConToken(`${API_BASE}/api/temas/docente/${localStorage.getItem('userId')}`);
         const temas = await leerJson(res);
         if (!res.ok) throw new Error(mensajeDeError(res, temas, 'No se pudieron cargar los temas.'));
+        temasDisponibles = temas.filter(tema => tema.activo !== 0);
         temaSelect.innerHTML = '<option value="">Seleccioná un tema existente</option>';
-        temas.filter(tema => tema.activo !== 0).forEach(tema => {
+        temasDisponibles.forEach(tema => {
           const option = document.createElement('option');
           option.value = tema.id;
           option.textContent = tema.nombre;
           temaSelect.appendChild(option);
         });
         if (temaId) temaSelect.value = String(temaId);
+        if (temaId && !temaSelect.value) {
+          temaId = null;
+          localStorage.removeItem(CLAVE_TEMA);
+        }
+        mostrarAdministracionTema();
         mostrarBloquePreguntas();
       } catch (error) {
         temaSelect.innerHTML = '<option value="">No se pudieron cargar los temas</option>';
@@ -182,7 +214,55 @@
       else localStorage.removeItem(CLAVE_TEMA);
       localStorage.setItem(CLAVE_PREGUNTAS, '[]');
       mensajeTema.textContent = temaId ? 'Tema seleccionado.' : '';
+      mostrarAdministracionTema();
       mostrarBloquePreguntas();
+    });
+
+    document.getElementById('btnActualizarTema').addEventListener('click', async () => {
+      const nombre = document.getElementById('editarTemaNombre').value.trim();
+      const descripcion = document.getElementById('editarTemaDescripcion').value.trim();
+      if (!temaId || !nombre) {
+        mensajeTema.textContent = 'El nombre del tema es obligatorio.';
+        return;
+      }
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, descripcion })
+        });
+        const data = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudo actualizar el tema.'));
+        mensajeTema.textContent = 'Tema actualizado correctamente.';
+        await cargarTemas();
+        temaSelect.value = String(temaId);
+        mostrarAdministracionTema();
+      } catch (error) {
+        mensajeTema.textContent = error.message || 'No se pudo actualizar el tema.';
+      }
+    });
+
+    document.getElementById('btnEliminarTema').addEventListener('click', async () => {
+      const tema = temasDisponibles.find(item => Number(item.id) === Number(temaId));
+      if (!temaId || !tema) return;
+      if (!window.confirm(`¿Eliminar el tema "${tema.nombre}"? También dejarán de mostrarse sus preguntas.`)) return;
+
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/temas/${temaId}`, { method: 'DELETE' });
+        const data = await leerJson(res);
+        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudo eliminar el tema.'));
+
+        localStorage.removeItem(`geoquiz.wizard.ubicaciones.${temaId}`);
+        localStorage.removeItem(CLAVE_TEMA);
+        localStorage.setItem(CLAVE_PREGUNTAS, '[]');
+        temaId = null;
+        preguntas = [];
+        mensajeTema.textContent = 'Tema eliminado correctamente.';
+        await cargarTemas();
+      } catch (error) {
+        mensajeTema.textContent = error.message || 'No se pudo eliminar el tema.';
+      }
     });
 
     document.getElementById('btnGuardarPregunta').addEventListener('click', async () => {

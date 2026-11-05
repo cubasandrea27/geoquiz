@@ -10,8 +10,8 @@ async function register(req, res) {
   if (!nombre || !apellido || !dni || !password) {
     return res.status(400).json({ error: 'Nombre, apellido, DNI y contraseña son obligatorios' });
   }
-  if (!/^\d{7,8}$/.test(dni) || password.length < 8) {
-    return res.status(400).json({ error: 'DNI inválido o contraseña demasiado corta (mínimo 8 caracteres)' });
+  if (!/^\d{7,8}$/.test(dni) || password.length !== 8) {
+    return res.status(400).json({ error: 'DNI inválido o la contraseña no tiene exactamente 8 caracteres' });
   }
   try {
     const hash = await bcrypt.hash(password, 10);

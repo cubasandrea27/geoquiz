@@ -28,7 +28,9 @@ function mostrarNotificacion(mensaje, tipo = 'info', duracionMs = 4000) {
 
   const noti = document.createElement('div');
   noti.className = `notificacion notificacion-${tipo}`;
-  noti.textContent = mensaje;
+  // Nunca mostrar la conversión poco útil "[object Object]".
+  const texto = typeof textoDeError === 'function' ? textoDeError(mensaje) : String(mensaje ?? '');
+  noti.textContent = texto || 'Ocurrió un error inesperado. Intentá nuevamente.';
   contenedor.appendChild(noti);
 
   // Forzar reflow para que la transición de entrada se vea

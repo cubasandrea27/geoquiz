@@ -32,11 +32,13 @@
         <input id="filtroDni" type="text" maxlength="8" inputmode="numeric" placeholder="Ingresá el DNI o parte del DNI">
       </div>
       <button class="ingresar" id="btnCargarResultados" type="button">Actualizar resultados</button>
+      <button class="boton-secundario" id="btnExportarCsv" type="button" style="width:100%; margin-top:8px;">Descargar resultados en CSV</button>
       <p id="mensajeResultados" class="wizard-mensaje" role="status"></p>
+      <div id="resumenTema"></div>
       <div id="resultados" class="wizard-lista"></div>
 
       <div class="wizard-acciones">
-        <a class="boton-secundario" href="docente-alumnos.html">Volver a alumnos</a>
+        <a class="boton-secundario" id="volverAlumnos" href="docente-alumnos.html">Volver a alumnos</a>
         <button class="ingresar" id="btnNuevoTema" type="button">Preparar otro tema</button>
       </div>
     </section>
@@ -52,44 +54,111 @@
     const params = new URLSearchParams(window.location.search);
     const temaId = Number(params.get('temaId') || localStorage.getItem('geoquiz.wizard.temaId'));
     let resultadosActuales = [];
+    let nombreTema = 'tema';
     const resultadosContenedor = document.getElementById('resultados');
+    const resumenContenedor = document.getElementById('resumenTema');
     const mensaje = document.getElementById('mensajeResultados');
 
     if (!temaId) window.location.href = 'docente-tema.html';
+    document.getElementById('volverAlumnos').href = `docente-alumnos.html?temaId=${temaId}`;
 
     function renderResultados() {
       const filtro = document.getElementById('filtroDni').value.trim();
       const filtrados = resultadosActuales.filter(alumno => !filtro || String(alumno.dni || '').includes(filtro));
 
+      const totalRespuestas = resultadosActuales.reduce((suma, alumno) => suma + Number(alumno.respuestas || 0), 0);
+      const totalCorrectas = resultadosActuales.reduce((suma, alumno) => suma + Number(alumno.correctas || 0), 0);
+      const conRespuestas = resultadosActuales.filter(alumno => Number(alumno.respuestas || 0) > 0).length;
+      const promedio = totalRespuestas ? Math.round((totalCorrectas / totalRespuestas) * 100) : 0;
+
+      resumenContenedor.innerHTML = `
+        <div class="resumen-tema">
+          <div><span class="dato">${resultadosActuales.length}</span><span>inscriptos</span></div>
+          <div><span class="dato">${conRespuestas}</span><span>respondieron</span></div>
+          <div><span class="dato">${totalRespuestas}</span><span>respuestas</span></div>
+          <div><span class="dato">${promedio}%</span><span>aciertos</span></div>
+        </div>`;
+
       resultadosContenedor.innerHTML = filtrados.length
         ? filtrados.map(alumno => `
-            <article class="resultado-wizard">
+            <article class="resultado-wizard tarjeta-resultado">
               <h3>${escaparHtml(alumno.nombre)} ${escaparHtml(alumno.apellido)}</h3>
               <p><strong>DNI:</strong> ${escaparHtml(alumno.dni || 'Sin DNI')}</p>
-              <p><strong>Puntaje:</strong> ${alumno.puntaje}</p>
-              <ul>${alumno.respuestas.map(respuesta => `
-                <li>${escaparHtml(respuesta.pregunta)}: <strong>${escaparHtml(respuesta.resultado)}</strong></li>
-              `).join('')}</ul>
+              ${Number(alumno.respuestas)
+                ? `<div class="barra-aciertos" role="img" aria-label="${Number(alumno.porcentaje || 0)}% de respuestas correctas">
+                     <span style="width:${Number(alumno.porcentaje || 0)}%;"></span>
+                   </div>
+                   <p class="dato">${alumno.correctas} de ${alumno.respuestas} correctas (${Number(alumno.porcentaje || 0)}%)</p>
+                   <details>
+                     <summary>Ver respuestas</summary>
+                     <ul>${alumno.detalle.map(respuesta => `
+                       <li>${escaparHtml(respuesta.pregunta)}: <strong>${escaparHtml(respuesta.resultado)}</strong> (${escaparHtml(respuesta.opcion_elegida)})</li>
+                     `).join('')}</ul>
+                   </details>`
+                : '<p>Todavía no respondió preguntas.</p>'}
             </article>`).join('')
-        : `<p class="wizard-ayuda">${filtro ? 'No hay resultados para ese DNI.' : 'Todavía no hay respuestas registradas.'}</p>`;
+        : `<p class="wizard-ayuda">${filtro ? 'No hay alumnos para ese DNI.' : 'Todavía no hay alumnos inscriptos.'}</p>`;
     }
 
     async function cargarResultados() {
       mensaje.textContent = 'Cargando resultados...';
       try {
-        const res = await fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`);
-        const data = await leerJson(res);
-        if (!res.ok) throw new Error(mensajeDeError(res, data, 'No se pudieron cargar los resultados.'));
-        resultadosActuales = Array.isArray(data) ? data : [];
+        const [resResumen, resDetalle, resInscriptos] = await Promise.all([
+          fetchConToken(`${API_BASE}/api/reportes/resumen/${temaId}`),
+          fetchConToken(`${API_BASE}/api/respuestas/por-tema/${temaId}`),
+          fetchConToken(`${API_BASE}/api/temas/${temaId}/alumnos`)
+        ]);
+        const resumen = await leerJson(resResumen);
+        const detalle = await leerJson(resDetalle);
+        const inscriptos = await leerJson(resInscriptos);
+        if (!resResumen.ok) throw new Error(mensajeDeError(resResumen, resumen, 'No se pudo cargar el resumen.'));
+        if (!resDetalle.ok) throw new Error(mensajeDeError(resDetalle, detalle, 'No se pudo cargar el detalle.'));
+        if (!resInscriptos.ok) throw new Error(mensajeDeError(resInscriptos, inscriptos, 'No se pudieron cargar los alumnos.'));
+
+        nombreTema = resumen.tema?.nombre || 'tema';
+        document.getElementById('tituloTema').textContent = `Resultados: ${nombreTema}`;
+        const dniPorAlumno = Object.fromEntries(inscriptos.map(alumno => [alumno.id, alumno.dni]));
+        const detallePorAlumno = Object.fromEntries(detalle.map(alumno => [alumno.alumno_id, alumno.respuestas]));
+        resultadosActuales = resumen.alumnos.map(alumno => ({
+          ...alumno,
+          dni: dniPorAlumno[alumno.alumno_id] || '',
+          detalle: detallePorAlumno[alumno.alumno_id] || []
+        }));
         mensaje.textContent = '';
         renderResultados();
       } catch (error) {
         mensaje.textContent = error.message || 'No se pudieron cargar los resultados.';
+        resumenContenedor.innerHTML = '';
+        resultadosContenedor.innerHTML = '';
+      }
+    }
+
+    async function exportarResultadosCsv() {
+      mensaje.textContent = 'Preparando archivo CSV...';
+      try {
+        const res = await fetchConToken(`${API_BASE}/api/reportes/csv/${temaId}`);
+        if (!res.ok) {
+          const data = await leerJson(res);
+          throw new Error(mensajeDeError(res, data, 'No se pudo descargar el CSV.'));
+        }
+
+        const archivo = await res.blob();
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(archivo);
+        enlace.download = `resultados_${nombreTema.replace(/[^a-z0-9_-]/gi, '_')}.csv`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        URL.revokeObjectURL(enlace.href);
+        mensaje.textContent = 'CSV descargado correctamente.';
+      } catch (error) {
+        mensaje.textContent = error.message || 'No se pudo descargar el CSV.';
       }
     }
 
     document.getElementById('filtroDni').addEventListener('input', renderResultados);
     document.getElementById('btnCargarResultados').addEventListener('click', cargarResultados);
+    document.getElementById('btnExportarCsv').addEventListener('click', exportarResultadosCsv);
     document.getElementById('btnNuevoTema').addEventListener('click', () => {
       localStorage.removeItem('geoquiz.wizard.temaId');
       localStorage.removeItem('geoquiz.wizard.preguntas');

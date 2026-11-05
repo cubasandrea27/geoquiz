@@ -31,12 +31,17 @@ function cambiarRolRegistro(btn, rol) {
 async function registrarUsuario() {
   const nombre = document.getElementById('nombre').value.trim();
   const apellido = document.getElementById('apellido').value.trim();
-  const password = document.getElementById('password').value.trim();
+  const password = document.getElementById('password').value;
   const dni = document.getElementById('dni').value.trim();
   const email = document.getElementById('email').value.trim();
 
   if (!nombre || !apellido || !password || (rolSeleccionado === 'alumno' ? !dni : !email)) {
     mostrarNotificacion('Completá todos los campos obligatorios.', 'error');
+    return;
+  }
+
+  if (password.length !== 8) {
+    mostrarNotificacion('La contraseña debe tener exactamente 8 caracteres.', 'error');
     return;
   }
 

@@ -164,7 +164,7 @@
         <button class="ingresar" id="btnRegistrarAlumnoTema" type="button">Registrar alumno al tema</button>
 
         <h3>Importar alumnos desde CSV</h3>
-        <p>El archivo tiene que tener las columnas <strong>nombre, apellido, dni y password</strong> (mínimo 8 caracteres).
+        <p>El archivo tiene que tener las columnas <strong>nombre, apellido, dni y password</strong> (exactamente 8 caracteres).
           Si lo tenés en Excel: Archivo → Guardar como → CSV.</p>
         <div class="campo">
           <label for="archivoAlumnosCsv">Archivo CSV</label>
@@ -1450,7 +1450,7 @@
           indiceActual = 0;
           puntaje = 0;
           respuestas = [];
-          preguntasRespondidasTema[temaActualId] = preguntasRespondidasTema[temaActualId] || new Set();
+          preguntasRespondidasTema[temaActualId] = preguntasRespondidasTema[temaActualId] || new Map();
           iniciarMonitoreoUbicacion(temaActualId);
           cargarPreguntasPorTema(temaActualId);
         };
@@ -1651,7 +1651,7 @@
             resumen.incorrectas += 1;
           }
           resumenTemas[temaActualId] = resumen;
-          preguntasRespondidasTema[temaActualId].add(pregunta.id);
+          preguntasRespondidasTema[temaActualId].set(pregunta.id, Date.now() + 5 * 60 * 1000);
           respuestaEnviada = true;
 
           radios.forEach((radio) => {
@@ -1683,7 +1683,9 @@
     }
 
     function finalizarCuestionario() {
-      detenerMonitoreoUbicacion();
+      // Mientras se muestra el resumen, consulta periódicamente al servidor.
+      // Cuando venza el bloqueo de 5 minutos la pregunta reaparecerá sola.
+      iniciarMonitoreoUbicacion(temaActualId);
       const contenedor = document.getElementById('preguntasAlumno');
       const resumenActual = resumenTemas[temaActualId];
       const filas = Object.values(resumenTemas)
@@ -1712,14 +1714,21 @@
           </thead>
           <tbody>${filas}</tbody>
         </table>
-        <p style="margin-top:16px;">Podés seleccionar otro tema para continuar.</p>
+        <p style="margin-top:16px;">Las preguntas respondidas volverán a aparecer después de 5 minutos. También podés seleccionar otro tema para continuar.</p>
         <button type="button" onclick="window.location.href='resultados.html'">Ver mis resultados por materia</button>
       `;
     }
 
     function filtrarPreguntasRespondidas(preguntas, temaId) {
-      const respondidas = preguntasRespondidasTema[temaId] || new Set();
-      return preguntas.filter(pregunta => !respondidas.has(pregunta.id));
+      const respondidas = preguntasRespondidasTema[temaId] || new Map();
+      const ahora = Date.now();
+
+      for (const [preguntaId, bloqueadaHasta] of respondidas) {
+        if (bloqueadaHasta <= ahora) respondidas.delete(preguntaId);
+      }
+
+      preguntasRespondidasTema[temaId] = respondidas;
+      return preguntas.filter(pregunta => (respondidas.get(pregunta.id) || 0) <= ahora);
     }
 
     function cerrarSesion() {
